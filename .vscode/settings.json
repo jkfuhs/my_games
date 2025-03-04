@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "glad.h": "c",
+        "memory": "cpp"
+    },
+    "cmake.sourceDirectory": "D:/my_games/lib/glm"
+}

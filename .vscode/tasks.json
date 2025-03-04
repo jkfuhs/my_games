@@ -1,0 +1,24 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "Build",
+            "command": "g++",
+            "args": [
+                "${workspaceRoot}/src/main.cpp",
+                "${workspaceRoot}/src/glad.c",
+                "${workspaceRoot}/src/WindowManager.cpp",
+                "-g",
+                "-std=c++17",
+                "-L${workspaceRoot}/lib",
+                "-I${workspaceRoot}/include",
+                "-lglfw3dll",
+                "-o",
+                "${workspaceFolder}/myprogram.exe"
+            ],
+            "group": "build"
+        },
+        
+    ],
+    "version": "2.0.0"
+}
