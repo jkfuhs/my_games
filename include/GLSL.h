@@ -13,7 +13,7 @@ namespace GLSL
     void printShaderInfoLog(GLuint shader);
     void checkVersion();
     GLint getAttribLocation(const GLuint program, const char varname[], bool verbose = true);
-    GLint getUniforrmLocation(const GLuint program, const char varname[], bool verbose = true);
+    GLint getUniformLocation(const GLuint program, const char varname[], bool verbose = true);
     void enableVertexAttribArray(const GLint handle);
     void disableVertexAttribArray(const GLint handle);
     void vertexAttribPointer(const GLint handle, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer);

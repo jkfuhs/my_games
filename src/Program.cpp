@@ -110,7 +110,7 @@ void Program::addAttribute(const std::string &name)
 
 void Program::addUniform(const std::string &name)
 {
-    uniforms[name] = GLSL::getUniforrmLocation(pid, name.c_str(), isVerbose());
+    uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
 }
 
 GLint Program::getAttribute(const std::string &name) const

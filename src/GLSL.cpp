@@ -122,12 +122,12 @@ namespace GLSL
         GLint r = glGetAttribLocation(program, varname);
         if (r < 0 && verbose)
         {
-            std::cerr << "WARN: " << varname << " cannot be boud (it either doesn't exist or has been optimized away). safeglAttrib calls will silently ignore it.\n" << std::endl;
+            std::cerr << "WARN: " << varname << " cannot be bound (it either doesn't exist or has been optimized away). safeglAttrib calls will silently ignore it.\n" << std::endl;
         }
         return r;
     }
 
-    GLint getUniforrmLocation(const GLuint program, const char varname[], bool verbose)
+    GLint getUniformLocation(const GLuint program, const char varname[], bool verbose)
     {
         GLint r = glGetUniformLocation(program, varname);
         if (r < 0 && verbose)

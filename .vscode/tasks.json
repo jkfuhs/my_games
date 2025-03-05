@@ -8,6 +8,8 @@
                 "${workspaceRoot}/src/main.cpp",
                 "${workspaceRoot}/src/glad.c",
                 "${workspaceRoot}/src/WindowManager.cpp",
+                "${workspaceRoot}/src/Program.cpp",
+                "${workspaceRoot}/src/GLSL.cpp",
                 "-g",
                 "-std=c++17",
                 "-L${workspaceRoot}/lib",
