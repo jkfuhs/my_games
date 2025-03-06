@@ -23,6 +23,7 @@
 #define PROJECT_NAME "my_game"
 #define RESOURCE_DIR "D:/my_games/resources"
 #define SHADER_DIR "D:/my_games/shaders/"
+#define NR_POINT_LIGHTS 4
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 // settings
@@ -49,7 +50,7 @@ class Application : public EventCallbacks
         float lastX = SCR_WIDTH / 2.0f;
         float lastY = SCR_HEIGHT / 2.0f;
         bool firstMouse = true;
-        glm::vec3 lightPos = glm::vec4(1.2f, 1.0f, 2.0f, 1.0f);
+        glm::vec3 directionalLight = glm::vec3(-0.2f, -1.0f, -0.3f);
         glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
         void cursorCallback(GLFWwindow *window, double xposIn, double yposIn)
@@ -184,15 +185,19 @@ class Application : public EventCallbacks
             prog->addUniform("material.specular");
             prog->addUniform("material.shine");
             prog->addUniform("material.emission");
-            // prog->addUniform("light.vector"); removed for spotlight calculation
-            prog->addUniform("light.position");
-            prog->addUniform("light.direction");
-            prog->addUniform("light.cutoff");
-            prog->addUniform("light.outerCutoff");
-            prog->addUniform("light.ambient");
-            prog->addUniform("light.diffuse");
-            prog->addUniform("light.specular");
-            prog->addUniform("light.attenuation");
+            prog->addUniform("dirLight.direction");
+            prog->addUniform("dirLight.ambient");
+            prog->addUniform("dirLight.diffuse");
+            prog->addUniform("dirLight.specular");
+            for (unsigned int i= 0; i < NR_POINT_LIGHTS; i++)
+            {
+                std::string uniform = "pointLights[" + std::to_string(i) + "]";
+                prog->addUniform(uniform + ".position");
+                prog->addUniform(uniform + ".ambient");
+                prog->addUniform(uniform + ".diffuse");
+                prog->addUniform(uniform + ".specular");
+                prog->addUniform(uniform + ".attenuation");
+            }
             prog->addUniform("viewPos");
 
             // Initialize shader for light sources
@@ -446,10 +451,7 @@ class Application : public EventCallbacks
             deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
 
-            // lightColor = glm::vec3(cos(currentFrame) * 2.0f, cos(currentFrame * 0.7f), cos(currentFrame * 1.3f));
-            // lightPos = glm::vec3(cos(currentFrame) * 1.2f, 1.0f + 2.0 * sin(currentFrame), 2.0f) ;
-
-            camera.move(deltaTime);
+           camera.move(deltaTime);
         }
         void render(unsigned int VAO, unsigned int lightVAO)
         {
@@ -468,6 +470,13 @@ class Application : public EventCallbacks
                 glm::vec3( 1.5f,  0.2f, -1.5f),
                 glm::vec3(-1.3f,  1.0f, -1.5f)
             };
+            glm::vec3 pointLightPositions[] = {
+                glm::vec3( 0.7f,  0.2f,  2.0f),
+                glm::vec3( 2.3f, -3.3f, -4.0f),
+                glm::vec3(-4.0f,  2.0f, -12.0f),
+                glm::vec3( 0.0f,  0.0f, -3.0f)
+            };
+
             // view/projection transformations
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
@@ -475,18 +484,23 @@ class Application : public EventCallbacks
             // set uniforms
             prog->bind();
             glUniform1f(prog->getUniform("material.shine"), 32.0f);
+            // set directional light uniforms
+            glUniform3fv(prog->getUniform("dirLight.direction"), 1, glm::value_ptr(directionalLight));
+            glUniform3fv(prog->getUniform("dirLight.ambient"), 1, glm::value_ptr(0.05f * lightColor));
+            glUniform3fv(prog->getUniform("dirLight.diffuse"), 1, glm::value_ptr(0.4f * lightColor));
+            glUniform3fv(prog->getUniform("dirLight.specular"), 1, glm::value_ptr(0.5f * lightColor));
+            // set point light uniforms
+            for (int i = 0; i < NR_POINT_LIGHTS; i++)
+            {
+                std::string uniform = "pointLights[" + std::to_string(i) + "]";
+                glUniform3fv(prog->getUniform(uniform + ".position"), 1, glm::value_ptr(pointLightPositions[i]));
+                glUniform3fv(prog->getUniform(uniform + ".ambient"), 1, glm::value_ptr(glm::vec3(0.05f)));
+                glUniform3fv(prog->getUniform(uniform + ".diffuse"), 1, glm::value_ptr(glm::vec3(0.8f)));
+                glUniform3fv(prog->getUniform(uniform + ".specular"), 1, glm::value_ptr(glm::vec3(1.0f)));
+                glUniform3fv(prog->getUniform(uniform + ".attenuation"), 1,glm::value_ptr(glm::vec3(1.0f, 0.09f, 0.032f)));
+            }
+            
 
-
-            glUniform3fv(prog->getUniform("light.ambient"), 1, glm::value_ptr(0.2f * lightColor));
-            glUniform3fv(prog->getUniform("light.diffuse"), 1, glm::value_ptr(0.5f * lightColor));
-            glUniform3fv(prog->getUniform("light.specular"), 1, glm::value_ptr(1.0f * lightColor));
-            glUniform3f(prog->getUniform("light.attenuation"), 1.0f, 0.09f, 0.032f);
-
-            // glUniform4fv(prog->getUniform("light.vector"), 1, glm::value_ptr(lightPos));
-            glUniform3fv(prog->getUniform("light.position"), 1, glm::value_ptr(camera.Position));
-            glUniform3fv(prog->getUniform("light.direction"), 1, glm::value_ptr(camera.Front));
-            glUniform1f(prog->getUniform("light.cutoff"), glm::cos(glm::radians(12.5f)));
-            glUniform1f(prog->getUniform("light.outerCutoff"), glm::cos(glm::radians(17.5f)));
             glUniform3fv(prog->getUniform("viewPos"), 1, glm::value_ptr(camera.Position));
             glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));
             glUniformMatrix4fv(prog->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view));
@@ -504,21 +518,23 @@ class Application : public EventCallbacks
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
-              prog->unbind();
+            prog->unbind();
 
-            // render lamp object
+            // render lamp objects
             lightProg->bind();
             glUniform3fv(lightProg->getUniform("Color"), 1, glm::value_ptr(lightColor));
             glUniformMatrix4fv(lightProg->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view));
             glUniformMatrix4fv(lightProg->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));
-            model  = glm::mat4(1.0f);
-            model = glm::translate(model, lightPos);
-            model = glm::scale(model, glm::vec3(0.2f));
-            glUniformMatrix4fv(lightProg->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
-            
-            glBindVertexArray(lightVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            
+            for (unsigned int i = 0; i < NR_POINT_LIGHTS; i++)
+            {
+                model  = glm::mat4(1.0f);
+                model = glm::translate(model, pointLightPositions[i]);
+                model = glm::scale(model, glm::vec3(0.2f));
+                glUniformMatrix4fv(lightProg->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
+                
+                glBindVertexArray(lightVAO);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            }
             // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             lightProg->unbind();
         }
