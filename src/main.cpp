@@ -17,12 +17,12 @@
 #include "stb_image.h"
 
 // value_ptr for glm
-#include "../lib/glm/gtc/type_ptr.hpp"
-#include "../lib/glm/gtc/matrix_transform.hpp"
+#include "D:/my_games/lib/glm/gtc/type_ptr.hpp"
+#include "D:/my_games/lib/glm/gtc/matrix_transform.hpp"
 
 #define PROJECT_NAME "my_game"
-#define RESOURCE_DIR "../resources/"
-#define SHADER_DIR "../shaders/"
+#define RESOURCE_DIR "D:/my_games/resources"
+#define SHADER_DIR "D:/my_games/shaders/"
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 // settings
