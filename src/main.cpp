@@ -49,7 +49,7 @@ class Application : public EventCallbacks
         float lastX = SCR_WIDTH / 2.0f;
         float lastY = SCR_HEIGHT / 2.0f;
         bool firstMouse = true;
-        glm::vec3 lightPos = glm::vec3(1.2f, 1.0f, 2.0f);
+        glm::vec3 lightPos = glm::vec4(1.2f, 1.0f, 2.0f, 1.0f);
         glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
         void cursorCallback(GLFWwindow *window, double xposIn, double yposIn)
@@ -184,10 +184,15 @@ class Application : public EventCallbacks
             prog->addUniform("material.specular");
             prog->addUniform("material.shine");
             prog->addUniform("material.emission");
+            // prog->addUniform("light.vector"); removed for spotlight calculation
             prog->addUniform("light.position");
+            prog->addUniform("light.direction");
+            prog->addUniform("light.cutoff");
+            prog->addUniform("light.outerCutoff");
             prog->addUniform("light.ambient");
             prog->addUniform("light.diffuse");
             prog->addUniform("light.specular");
+            prog->addUniform("light.attenuation");
             prog->addUniform("viewPos");
 
             // Initialize shader for light sources
@@ -451,6 +456,18 @@ class Application : public EventCallbacks
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            glm::vec3 cubePositions[] = {
+                glm::vec3( 0.0f,  0.0f,  0.0f),
+                glm::vec3( 2.0f,  5.0f, -15.0f),
+                glm::vec3(-1.5f, -2.2f, -2.5f),
+                glm::vec3(-3.8f, -2.0f, -12.3f),
+                glm::vec3( 2.4f, -0.4f, -3.5f),
+                glm::vec3(-1.7f,  3.0f, -7.5f),
+                glm::vec3( 1.3f, -2.0f, -2.5f),
+                glm::vec3( 1.5f,  2.0f, -2.5f),
+                glm::vec3( 1.5f,  0.2f, -1.5f),
+                glm::vec3(-1.3f,  1.0f, -1.5f)
+            };
             // view/projection transformations
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
@@ -463,21 +480,32 @@ class Application : public EventCallbacks
             glUniform3fv(prog->getUniform("light.ambient"), 1, glm::value_ptr(0.2f * lightColor));
             glUniform3fv(prog->getUniform("light.diffuse"), 1, glm::value_ptr(0.5f * lightColor));
             glUniform3fv(prog->getUniform("light.specular"), 1, glm::value_ptr(1.0f * lightColor));
+            glUniform3f(prog->getUniform("light.attenuation"), 1.0f, 0.09f, 0.032f);
 
-            glUniform3fv(prog->getUniform("light.position"), 1, glm::value_ptr(lightPos));
+            // glUniform4fv(prog->getUniform("light.vector"), 1, glm::value_ptr(lightPos));
+            glUniform3fv(prog->getUniform("light.position"), 1, glm::value_ptr(camera.Position));
+            glUniform3fv(prog->getUniform("light.direction"), 1, glm::value_ptr(camera.Front));
+            glUniform1f(prog->getUniform("light.cutoff"), glm::cos(glm::radians(12.5f)));
+            glUniform1f(prog->getUniform("light.outerCutoff"), glm::cos(glm::radians(17.5f)));
             glUniform3fv(prog->getUniform("viewPos"), 1, glm::value_ptr(camera.Position));
             glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));
             glUniformMatrix4fv(prog->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view));
 
-            // light model transformations
-            glm::mat4 model = glm::mat4(1.0f);
-            glUniformMatrix4fv(prog->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
-
-            // render cube
             glBindVertexArray(VAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            // light model transformations
+            glm::mat4 model;
+            for (unsigned int i = 0; i < 10; i++)
+            {
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, cubePositions[i]);
+                float angle = 20.0f * i;
+                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                glUniformMatrix4fv(prog->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            }
 
-            prog->unbind();
+              prog->unbind();
+
             // render lamp object
             lightProg->bind();
             glUniform3fv(lightProg->getUniform("Color"), 1, glm::value_ptr(lightColor));
