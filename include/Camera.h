@@ -20,7 +20,7 @@ enum Camera_Movement {
 // Default camera values
 const float YAW             = -90.0f;
 const float PITCH           = 0.0f;
-const float SPEED           = 0.2f;
+const float SPEED           = 2.5f;
 const float SENSITIVITY     = 0.1f;
 const float ZOOM            = 45.0f;
 
@@ -139,8 +139,9 @@ public:
         right.y = 0;
         if (Motion != glm::vec3(0))
         {
-            Position -= Motion.z * front;
-            Position += Motion.x * right;
+            Position -= Motion.z * front * deltaTime;
+            Position += Motion.x * right * deltaTime;
+            Position += Motion.y * WorldUp * deltaTime;
         }
     }
 private:

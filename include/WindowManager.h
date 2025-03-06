@@ -56,7 +56,7 @@ public:
 	WindowManager(const WindowManager&) = delete;
 	WindowManager& operator= (const WindowManager&) = delete;
 
-	bool init(int const width, int const height);
+	bool init(int const width, int const height, const char *windowName);
 	void shutdown();
 
 	void setEventCallbacks(EventCallbacks *callbacks);
