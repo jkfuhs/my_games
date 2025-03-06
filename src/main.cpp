@@ -77,7 +77,6 @@ class Application : public EventCallbacks
             
             camera.rotateCamera(xoffset, yoffset);
         }
-        
         void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
         {
             if (action == GLFW_PRESS)
