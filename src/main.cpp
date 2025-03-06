@@ -170,7 +170,7 @@ class Application : public EventCallbacks
             // Initialize the GLSL program that we will use for local shading
             prog = std::make_shared<Program>();
             prog->setVerbose(true);
-            prog->setShaderNames(shaderDirectory + "/simpleVertex.glsl", shaderDirectory + "/simpleFragment.glsl");
+            prog->setShaderNames(shaderDirectory + "/simpleVertex.vs", shaderDirectory + "/simpleFragment.fs");
             prog->init();
             prog->addAttribute("aPos");
             prog->addAttribute("aNormal");
@@ -193,7 +193,7 @@ class Application : public EventCallbacks
             // Initialize shader for light sources
             lightProg = std::make_shared<Program>();
             lightProg->setVerbose(true);
-            lightProg->setShaderNames(shaderDirectory + "/lightVertex.glsl", shaderDirectory + "/lightFragment.glsl");
+            lightProg->setShaderNames(shaderDirectory + "/lightVertex.vs", shaderDirectory + "/lightFragment.fs");
             lightProg->init();
             lightProg->addAttribute("aPos");
             lightProg->addUniform("model");
