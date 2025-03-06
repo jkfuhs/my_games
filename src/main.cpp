@@ -180,9 +180,14 @@ class Application : public EventCallbacks
             prog->addUniform("model");
             prog->addUniform("view");
             prog->addUniform("projection");
-            prog->addUniform("lightColor");
-            prog->addUniform("objectColor");
-            prog->addUniform("lightPos");
+            prog->addUniform("material.ambient");
+            prog->addUniform("material.diffuse");
+            prog->addUniform("material.specular");
+            prog->addUniform("material.shine");
+            prog->addUniform("light.position");
+            prog->addUniform("light.ambient");
+            prog->addUniform("light.diffuse");
+            prog->addUniform("light.specular");
             prog->addUniform("viewPos");
 
             // Initialize shader for light sources
@@ -309,6 +314,7 @@ class Application : public EventCallbacks
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
 
+            // initTextures()
             // load textures
             // texture 1
             // unsigned int texture1, texture2;
@@ -406,7 +412,8 @@ class Application : public EventCallbacks
             deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
 
-            lightPos = glm::vec3(cos(currentFrame) * 1.2f, 1.0f + 2.0 * sin(currentFrame), 2.0f) ;
+            lightColor = glm::vec3(cos(currentFrame) * 2.0f, cos(currentFrame * 0.7f), cos(currentFrame * 1.3f));
+            // lightPos = glm::vec3(cos(currentFrame) * 1.2f, 1.0f + 2.0 * sin(currentFrame), 2.0f) ;
 
             camera.move(deltaTime);
         }
@@ -421,9 +428,17 @@ class Application : public EventCallbacks
 
             // set uniforms
             prog->bind();
-            glUniform3f(prog->getUniform("objectColor"), 1.0f, 0.5f, 0.31f);
-            glUniform3fv(prog->getUniform("lightColor"), 1, glm::value_ptr(lightColor));
-            glUniform3fv(prog->getUniform("lightPos"), 1, glm::value_ptr(lightPos));
+            glUniform3f(prog->getUniform("material.ambient"), 1.0f, 0.5f, 0.31f);
+            glUniform3f(prog->getUniform("material.diffuse"), 1.0f, 0.5f, 0.31f);
+            glUniform3f(prog->getUniform("material.specular"), 0.5f, 0.5f, 0.5f);
+            glUniform1f(prog->getUniform("material.shine"), 32.0f);
+
+
+            glUniform3fv(prog->getUniform("light.ambient"), 1, glm::value_ptr(0.2f * lightColor));
+            glUniform3fv(prog->getUniform("light.diffuse"), 1, glm::value_ptr(0.5f * lightColor));
+            glUniform3fv(prog->getUniform("light.specular"), 1, glm::value_ptr(1.0f * lightColor));
+
+            glUniform3fv(prog->getUniform("light.position"), 1, glm::value_ptr(lightPos));
             glUniform3fv(prog->getUniform("viewPos"), 1, glm::value_ptr(camera.Position));
             glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));
             glUniformMatrix4fv(prog->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view));
@@ -448,7 +463,7 @@ class Application : public EventCallbacks
             glUniformMatrix4fv(lightProg->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model));
             
             glBindVertexArray(lightVAO);
-            // glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
             
             // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             lightProg->unbind();
@@ -463,7 +478,7 @@ int main()
     std::string shaderDir = SHADER_DIR;
     Application *application = new Application();
     WindowManager *windowManager = new WindowManager();
-    windowManager->init(800, 600, PROJECT_NAME);
+    windowManager->init(SCR_WIDTH, SCR_HEIGHT, PROJECT_NAME);
     windowManager->setEventCallbacks(application);
     application->windowManager = windowManager;
     
