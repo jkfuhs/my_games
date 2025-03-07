@@ -175,20 +175,22 @@ class Application : public EventCallbacks
             prog->init();
             prog->addAttribute("aPos");
             prog->addAttribute("aNormal");
-            // prog->addUniform("texture1");
-            // prog->addUniform("texture2");
-            // prog->addUniform("mixRatio");
+            // tranform matrices
             prog->addUniform("model");
             prog->addUniform("view");
             prog->addUniform("projection");
+            // material uniforms
             prog->addUniform("material.diffuse");
             prog->addUniform("material.specular");
             prog->addUniform("material.shine");
             prog->addUniform("material.emission");
+            // light uniforms
+                // directional light
             prog->addUniform("dirLight.direction");
             prog->addUniform("dirLight.ambient");
             prog->addUniform("dirLight.diffuse");
             prog->addUniform("dirLight.specular");
+                // point lights
             for (unsigned int i= 0; i < NR_POINT_LIGHTS; i++)
             {
                 std::string uniform = "pointLights[" + std::to_string(i) + "]";
@@ -198,7 +200,17 @@ class Application : public EventCallbacks
                 prog->addUniform(uniform + ".specular");
                 prog->addUniform(uniform + ".attenuation");
             }
+                // spotlight
+            prog->addUniform("spotLight.position");
+            prog->addUniform("spotLight.direction");
+            prog->addUniform("spotLight.ambient");
+            prog->addUniform("spotLight.diffuse");
+            prog->addUniform("spotLight.specular");
+            prog->addUniform("spotLight.attenuation");
+            prog->addUniform("spotLight.centerCone");
+            prog->addUniform("spotLight.outerCone");
             prog->addUniform("viewPos");
+            
 
             // Initialize shader for light sources
             lightProg = std::make_shared<Program>();
@@ -494,12 +506,19 @@ class Application : public EventCallbacks
             {
                 std::string uniform = "pointLights[" + std::to_string(i) + "]";
                 glUniform3fv(prog->getUniform(uniform + ".position"), 1, glm::value_ptr(pointLightPositions[i]));
-                glUniform3fv(prog->getUniform(uniform + ".ambient"), 1, glm::value_ptr(glm::vec3(0.05f)));
-                glUniform3fv(prog->getUniform(uniform + ".diffuse"), 1, glm::value_ptr(glm::vec3(0.8f)));
-                glUniform3fv(prog->getUniform(uniform + ".specular"), 1, glm::value_ptr(glm::vec3(1.0f)));
-                glUniform3fv(prog->getUniform(uniform + ".attenuation"), 1,glm::value_ptr(glm::vec3(1.0f, 0.09f, 0.032f)));
-            }
-            
+                glUniform3fv(prog->getUniform(uniform + ".ambient"), 1, glm::value_ptr(0.05f * lightColor));
+                glUniform3fv(prog->getUniform(uniform + ".diffuse"), 1, glm::value_ptr(0.8f * lightColor));
+                glUniform3fv(prog->getUniform(uniform + ".specular"), 1, glm::value_ptr(1.0f * lightColor));
+                glUniform3f(prog->getUniform(uniform + ".attenuation"), 1.0f, 0.09f, 0.032f);
+            } 
+            // set spotlight uniforms
+            glUniform3fv(prog->getUniform("spotLight.position"), 1, glm::value_ptr(camera.Position));
+            glUniform3fv(prog->getUniform("spotLight.direction"), 1, glm::value_ptr(camera.Front));
+            glUniform3fv(prog->getUniform("spotLight.ambient"), 1, glm::value_ptr(0.05f * lightColor));
+            glUniform3fv(prog->getUniform("spotLight.diffuse"), 1, glm::value_ptr(0.8f * lightColor));
+            glUniform3f(prog->getUniform("spotLight.attenuation"), 1.0f, 0.09f, 0.032f);
+            glUniform1f(prog->getUniform("spotLight.centerCone"), glm::cos(glm::radians(12.5f)));
+            glUniform1f(prog->getUniform("spotLight.outerCone"), glm::cos(glm::radians(17.5f)));
 
             glUniform3fv(prog->getUniform("viewPos"), 1, glm::value_ptr(camera.Position));
             glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection));

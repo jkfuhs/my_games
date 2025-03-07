@@ -22,6 +22,20 @@ struct PointLight
 
     vec3 attenuation;
 };
+struct SpotLight
+{
+    vec3 position;
+    vec3 direction;
+
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+
+    vec3 attenuation;
+    float centerCone;
+    float outerCone;
+};
+
 
 #define NR_POINT_LIGHTS 4
 
@@ -32,6 +46,7 @@ in vec2 TexCoords;
 uniform Material material;
 uniform DirLight dirLight;
 uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform SpotLight spotLight;
 
 uniform vec3 viewPos;
 
@@ -71,6 +86,35 @@ vec3 CalculatePointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewD
     return ambient + diffuse + specular;
 }
 
+vec3 CalculateSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+{
+    vec3 lightDir = normalize(light.position - fragPos);
+    float theta = dot(lightDir, normalize(-light.direction));
+    if (theta > light.outerCone)
+    {
+        // in flashlight, do calculations
+        float epsilon = light.centerCone - light.outerCone;
+        float intensity = clamp((theta - light.outerCone) / epsilon, 0.0, 1.0);
+        // diffuse shading
+        float diff = max(dot(normal, lightDir), 0.0);
+        // specular shading
+        vec3 reflectDir = reflect(-lightDir, normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shine);
+        // attenuation
+        float distance = length(light.position - fragPos);
+        float attenuation = 1.0 / (light.attenuation.x + light.attenuation.y * distance +
+                                    light.attenuation.z * (distance * distance));
+        // combine results
+        vec3 ambient = light.ambient * vec3(texture(material.diffuse, TexCoords));
+        vec3 diffuse = light.diffuse * diff * vec3(texture(material.diffuse, TexCoords));
+        vec3 specular = light.specular * spec * vec3(texture(material.specular, TexCoords));
+        return ambient + intensity * (diffuse + specular);
+    }
+    else
+        // outside flashlight: only calculate ambient light
+        return light.ambient * vec3(texture(material.diffuse, TexCoords));
+}
+
 void main()
 {
     // properties
@@ -86,12 +130,13 @@ void main()
     }
 
     // spotlight
-    // result += CalculateSpotLight(spotLight, norm, FragPos, viewDir);
+    result += CalculateSpotLight(spotLight, norm, FragPos, viewDir);
+    
     // emission
-    if (vec3(texture(material.specular, TexCoords)) == vec3(0.0))
-    {
-        result += vec3(texture(material.emission, TexCoords));
-    }
+    // if (vec3(texture(material.specular, TexCoords)) == vec3(0.0))
+    // {
+    //     result += vec3(texture(material.emission, TexCoords));
+    // }
     FragColor = vec4(result, 1.0);
 
 }
