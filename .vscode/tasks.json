@@ -10,6 +10,8 @@
                 "${workspaceRoot}/src/WindowManager.cpp",
                 "${workspaceRoot}/src/Program.cpp",
                 "${workspaceRoot}/src/GLSL.cpp",
+                "${workspaceRoot}/src/Mesh.cpp",
+                "${workspaceRoot}/src/Model.cpp",
                 "-g",
                 "-std=c++17",
                 "-L${workspaceRoot}/lib",

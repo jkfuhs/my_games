@@ -8,6 +8,8 @@
 
 #include <glad/glad.h>
 
+#include "D:/my_games/lib/glm/gtc/type_ptr.hpp"
+
 std::string readFileAsString(const std::string &fileName);
 
 class Program
@@ -33,6 +35,9 @@ class Program
 
         void addAttribute(const std::string &name);
         void addUniform(const std::string &name);
+        void setInt(const std::string &name, int i);
+        void setFloat(const std::string &name, float f);
+        void setVector3f(const std::string &name, glm::vec3 v);
         GLint getAttribute(const std::string &name) const;
         GLint getUniform(const std::string &name) const;
 };

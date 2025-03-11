@@ -113,6 +113,42 @@ void Program::addUniform(const std::string &name)
     uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
 }
 
+void Program::setInt(const std::string &name, int i)
+{
+    std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
+    if (uniform == uniforms.end())
+    {
+        uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
+        CHECKED_GL_CALL(glUniform1i(uniforms[name], i));
+        return;
+    }
+    CHECKED_GL_CALL(glUniform1i(uniform->second, i));
+}
+
+void Program::setFloat(const std::string &name, float f)
+{
+    std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
+    if (uniform == uniforms.end())
+    {
+        uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
+        CHECKED_GL_CALL(glUniform1f(uniforms[name], f));
+        return;
+    }
+    CHECKED_GL_CALL(glUniform1f(uniform->second, f));
+}
+
+void Program::setVector3f(const std::string &name, glm::vec3 v)
+{
+    std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
+    if (uniform == uniforms.end())
+    {
+        uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
+        CHECKED_GL_CALL(glUniform3fv(uniforms[name], 1, glm::value_ptr(v)));
+        return;
+    }
+    CHECKED_GL_CALL(glUniform3fv(uniform->second, 1, glm::value_ptr(v)));
+}
+
 GLint Program::getAttribute(const std::string &name) const
 {
     std::map<std::string, GLint>::const_iterator attribute = attributes.find(name.c_str());
