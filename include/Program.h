@@ -38,6 +38,7 @@ class Program
         void setInt(const std::string &name, int i);
         void setFloat(const std::string &name, float f);
         void setVector3f(const std::string &name, glm::vec3 v);
+        void setMat4(const std::string &name, glm::mat4 m);
         GLint getAttribute(const std::string &name) const;
         GLint getUniform(const std::string &name) const;
 };

@@ -56,6 +56,11 @@ void Model::loadModel(std::string path)
     {
         loadMaterialTextures(materials[m]);
     }
+
+    for (size_t m = 0; m < meshes.size(); m++)
+    {
+        meshes[m].center(model_min, model_max);
+    }
 }
 
 void Model::loadMaterialTextures(tinyobj::material_t material)
@@ -119,13 +124,21 @@ Mesh Model::processMesh(tinyobj::shape_t shape, tinyobj::attrib_t attribs, std::
                 vertex.TexCoord.y = attribs.texcoords[2 * size_t(idx.texcoord_index) + 1];
             }
 
+            // compute model limits
+            model_min.x = min(model_min.x, vertex.Position.x);
+            model_min.y = min(model_min.y, vertex.Position.y);
+            model_min.z = min(model_min.z, vertex.Position.z);
+
+            model_max.x = max(model_max.x, vertex.Position.x);
+            model_max.y = max(model_max.y, vertex.Position.y);
+            model_max.z = max(model_max.z, vertex.Position.z);
+
             vertices.push_back(vertex);            
         }            
         index_offset += fv;
     }
     
     return Mesh(vertices, shape.mesh.material_ids);
-    
 }
 
 unsigned int TextureFromFile(const std::string path, const std::string &directory, bool gamma)

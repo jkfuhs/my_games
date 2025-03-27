@@ -149,6 +149,18 @@ void Program::setVector3f(const std::string &name, glm::vec3 v)
     CHECKED_GL_CALL(glUniform3fv(uniform->second, 1, glm::value_ptr(v)));
 }
 
+void Program::setMat4(const std::string &name, glm::mat4 m)
+{
+    std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
+    if (uniform == uniforms.end())
+    {
+        uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
+        CHECKED_GL_CALL(glUniformMatrix4fv(uniforms[name], 1, GL_FALSE, glm::value_ptr(m)));
+        return;
+    }
+    CHECKED_GL_CALL(glUniformMatrix4fv(uniform->second, 1, GL_FALSE, glm::value_ptr(m)));
+}
+
 GLint Program::getAttribute(const std::string &name) const
 {
     std::map<std::string, GLint>::const_iterator attribute = attributes.find(name.c_str());

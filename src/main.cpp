@@ -44,8 +44,11 @@ class Application : public EventCallbacks
         
         // default shader program
         std::shared_ptr<Program> prog;
-        // texture shader program
+        // light source shader program
         std::shared_ptr<Program> lightProg;
+        // skysphere shader program
+        std::shared_ptr<Program> skyProg;
+
         // mix ratio uniform
         float mixRatio = 0.2;
 
@@ -53,6 +56,8 @@ class Application : public EventCallbacks
 
         float deltaTime = 0.0f;
         float lastFrame = 0.0f;
+        Model *skySphere;
+        unsigned int skySphereTexture;
         Model *ourModel;
 
         float lastX = SCR_WIDTH / 2.0f;
@@ -60,6 +65,12 @@ class Application : public EventCallbacks
         bool firstMouse = true;
         glm::vec3 directionalLight = glm::vec3(-0.2f, -1.0f, -0.3f);
         glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+
+        unsigned int cubeVAO, cubeVBO;
+        unsigned int planeVAO, planeVBO;
+
+        unsigned int cubeTexture;
+        unsigned int planeTexture;
 
         void cursorCallback(GLFWwindow *window, double xposIn, double yposIn)
         {
@@ -170,6 +181,7 @@ class Application : public EventCallbacks
 
             // enable z-buffer
             CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
+            glDepthFunc(GL_LESS); 
 
             // intialize and set starting camera location
             camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -182,10 +194,6 @@ class Application : public EventCallbacks
             prog->addAttribute("aPos");
             prog->addAttribute("aNormal");
             prog->addAttribute("aTexCoords");
-            // tranform matrices
-            prog->addUniform("model");
-            prog->addUniform("view");
-            prog->addUniform("projection");
 
             // Initialize shader for light sources
             lightProg = std::make_shared<Program>();
@@ -193,32 +201,118 @@ class Application : public EventCallbacks
             lightProg->setShaderNames(shaderDirectory + "/lightVertex.vs", shaderDirectory + "/lightFragment.fs");
             lightProg->init();
             lightProg->addAttribute("aPos");
-            lightProg->addUniform("model");
-            lightProg->addUniform("view");
-            lightProg->addUniform("projection");
-            
+
+            // Initialize shader for sky
+            skyProg = std::make_shared<Program>();
+            skyProg->setVerbose(true);
+            skyProg->setShaderNames(shaderDirectory + "/skyShader.vs", shaderDirectory + "/skyShader.fs");
+            skyProg->init();
+            skyProg->addAttribute("aPos");
+            skyProg->addAttribute("aTexCoords");
         }
 
         void initGeom(const std::string&resourceDirectory)
         {
-            ourModel = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
+            // skySphere = new Model((resourceDirectory + "/sphere.obj").c_str());
+            // stbi_set_flip_vertically_on_load(true);
+            // skySphereTexture = TextureFromFile("/jungle_panorama.jpg", resourceDirectory);
+            // stbi_set_flip_vertically_on_load(false);
+            // ourModel = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
+            
+            // set up vertex data (and buffer(s)) and configure vertex attributes
+            // ------------------------------------------------------------------
+            float cubeVertices[] = {
+                // positions          // texture Coords
+                -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+                0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
 
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+            };
+            
+
+            glGenVertexArrays(1, &cubeVAO);
+            glGenBuffers(1, &cubeVBO);
+            glBindVertexArray(cubeVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glBindVertexArray(0);
+
+            stbi_set_flip_vertically_on_load(true);
+            cubeTexture  = TextureFromFile("/marble.jpg", resourceDirectory);
         }
 
-        void initGround()
+        void initGround(std::string& resourceDir)
         {
-            // TODO:initGround
+            float planeVertices[] = {
+                // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+                5.0f, -0.501f,  5.0f,  2.0f, 0.0f,
+                -5.0f, -0.501f,  5.0f,  0.0f, 0.0f,
+                -5.0f, -0.501f, -5.0f,  0.0f, 2.0f,
+
+                5.0f, -0.501f,  5.0f,  2.0f, 0.0f,
+                -5.0f, -0.501f, -5.0f,  0.0f, 2.0f,
+                5.0f, -0.501f, -5.0f,  2.0f, 2.0f								
+            };
+
+            glGenVertexArrays(1, &planeVAO);
+            glGenBuffers(1, &planeVBO);
+            glBindVertexArray(planeVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glBindVertexArray(0);
+
+            planeTexture = TextureFromFile("/metal.png", resourceDir);
+
         }
 
         void drawGround(std::shared_ptr<Program> curS)
         {
             // TODO:drawGround
-        }
-
-        // helper function to pass material data to GPU
-        void SetMaterial(std::shared_ptr<Program> curS, int mat)
-        {
-            // TODO:SetMaterrial
         }
 
         // helper function to set model transforms
@@ -236,6 +330,13 @@ class Application : public EventCallbacks
         {
             CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix())));
         }
+        void shutdown()
+        {
+            glDeleteVertexArrays(1, &cubeVAO);
+            glDeleteVertexArrays(1, &planeVAO);
+            glDeleteBuffers(1, &cubeVBO);
+            glDeleteBuffers(1, &planeVBO);
+        }
         void updateVars()
         {
             float currentFrame = glfwGetTime();
@@ -244,41 +345,89 @@ class Application : public EventCallbacks
 
             camera.move(deltaTime);
         }
+        void render_sky(glm::mat4 projection)
+        {
+            skyProg->bind();
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+            skyProg->setInt("texture1", 0);
+            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, skySphereTexture));
+            
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, camera.Position);
+            model = glm::scale(model, glm::vec3(10.0f));
+            glm::mat4 view = camera.GetViewMatrix();
+
+            CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model)));
+            // CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view)));
+            CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection)));
+
+            skySphere->Draw(skyProg);
+            skyProg->unbind();
+        }
         void render()
         {
-            CHECKED_GL_CALL(glClearColor(0.05f, 0.05f, 0.05f, 1.0f));
-            CHECKED_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+            // CHECKED_GL_CALL(glClearColor(0.05f, 0.05f, 0.05f, 1.0f));
+            // CHECKED_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
             // view/projection transformations
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
 
-            // render basic cube objects
-            prog->bind();
-            prog->setFloat(("material.shine"), 32.0f);
+            // render_sky(projection);
+            // render pbjects
+            // prog->bind();
+            // prog->setFloat(("material.shine"), 32.0f);
 
-            prog->setVector3f("spotLight.position", camera.Position);
-            prog->setVector3f("spotLight.direction", camera.Front);
-            prog->setVector3f("spotLight.ambient", glm::vec3(0.05f));
-            prog->setVector3f("spotLight.diffuse", glm::vec3(0.5f));
-            prog->setVector3f("spotLight.specular", glm::vec3(1.0f));
-            prog->setVector3f("spotLight.attenuation", glm::vec3(1.0f, 0.09f, 0.032f));
-            prog->setFloat("spotLight.centerCone", glm::cos(glm::radians(12.5f)));
-            prog->setFloat("spotLight.outerCone", glm::cos(glm::radians(17.5f)));
+            // prog->setVector3f("spotLight.position", camera.Position);
+            // prog->setVector3f("spotLight.direction", camera.Front);
+            // prog->setVector3f("spotLight.ambient", glm::vec3(0.05f));
+            // prog->setVector3f("spotLight.diffuse", glm::vec3(0.5f));
+            // prog->setVector3f("spotLight.specular", glm::vec3(1.0f));
+            // prog->setVector3f("spotLight.attenuation", glm::vec3(1.0f, 0.09f, 0.032f));
+            // prog->setFloat("spotLight.centerCone", glm::cos(glm::radians(12.5f)));
+            // prog->setFloat("spotLight.outerCone", glm::cos(glm::radians(17.5f)));
 
             
             // set view/projection transforms
-            CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection)));
-            CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view)));
+            // CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection)));
+            // CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view)));
           
             // render loaded model
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
-            CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model)));
-            (*ourModel).Draw(prog);
-            prog->unbind();
+            // glm::mat4 model = glm::mat4(1.0f);
+            // model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+            // model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+            // CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model)));
+            // (*ourModel).Draw(prog);
+            // prog->unbind();
 
+            skyProg->bind();
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+            skyProg->setInt("texture1", 0);
+
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glm::mat4 model = glm::mat4(1.0f);
+            skyProg->setMat4("view", view);
+            skyProg->setMat4("projection", projection);
+            // cubes
+            glBindVertexArray(cubeVAO);
+            glBindTexture(GL_TEXTURE_2D, cubeTexture);
+            model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+            skyProg->setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
+            skyProg->setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            // floor
+            glBindVertexArray(planeVAO);
+            glBindTexture(GL_TEXTURE_2D, planeTexture);
+            skyProg->setMat4("model", glm::mat4(1.0f));
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+
+            skyProg->unbind();
         }
 };
 
@@ -296,15 +445,19 @@ int main()
     
     application->init(shaderDir, resourceDir);
     application->initGeom(resourceDir);
+    application->initGround(resourceDir);
     
     while (!glfwWindowShouldClose(windowManager->getHandle()))
     {
         application->updateVars();
         application->render();
+        
         glfwSwapBuffers(windowManager->getHandle());
         glfwPollEvents();
     }
 
+    // de-allocate all resources
+    application->shutdown();
     glfwTerminate();
     return 0;
 }

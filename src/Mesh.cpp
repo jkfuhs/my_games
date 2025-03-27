@@ -48,37 +48,40 @@ void Mesh::Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t
     unsigned int textureNr = 0;
 
     // loop through mesh's material_ids
-    for (unsigned int i = 0; i < material_ids.size(); i++)
+    if (material_ids[0] >= 0)
     {
-         // activate texture unit before binding
-        // retrieve texture number
-        std::string number;
-        std::string name;
-
-        // bind diffuse texture
-        name = materials[i].diffuse_texname;
-        if (name.size() > 0)
+        for (unsigned int i = 0; i < material_ids.size(); i++)
         {
-            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + textureNr));
-            number = std::to_string(diffuseNr);
-            shader->setInt(("material.texture_diffuse" + number).c_str(), textureNr);
-            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, textures[name]));
-            textureNr++;
-            diffuseNr++;
+            // activate texture unit before binding
+            // retrieve texture number
+            std::string number;
+            std::string name;
+
+            // bind diffuse texture
+            name = materials[i].diffuse_texname;
+            if (name.size() > 0)
+            {
+                CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + textureNr));
+                number = std::to_string(diffuseNr);
+                shader->setInt(("material.texture_diffuse" + number).c_str(), textureNr);
+                CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, textures[name]));
+                textureNr++;
+                diffuseNr++;
+            }
+
+            
+            // bind specular texture
+            name = materials[i].specular_texname;
+            if (name.size() > 0)
+            {
+                CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + textureNr));
+                number = std::to_string(specularNr);
+                shader->setInt(("material.texture_specular" + number).c_str(), textureNr);
+                CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, textures[name]));
+                textureNr++;
+                specularNr++;
+            }        
         }
-
-        
-        // bind specular texture
-        name = materials[i].specular_texname;
-        if (name.size() > 0)
-        {
-            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + textureNr));
-            number = std::to_string(specularNr);
-            shader->setInt(("material.texture_specular" + number).c_str(), textureNr);
-            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, textures[name]));
-            textureNr++;
-            specularNr++;
-        }        
     }
     CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
 
@@ -87,4 +90,28 @@ void Mesh::Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t
     CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, vertices.size()));
     // glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
     CHECKED_GL_CALL(glBindVertexArray(0));
+}
+
+void Mesh::center(glm::vec3 model_min, glm::vec3 model_max)
+{
+    glm::vec3 translate;
+    float scale;
+
+    translate = 0.5f * (model_min + model_max);
+    scale = max(max(model_max.x - model_min.x, model_max.y - model_min.y), model_max.z - model_min.z);
+
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        vertices[i].Position -= translate;
+        vertices[i].Position *= 2.0f / scale;
+    }
+}
+
+float min(float x, float y)
+{
+    return x < y ? x : y;
+}
+float max(float x, float y)
+{
+    return x > y ? x : y;
 }

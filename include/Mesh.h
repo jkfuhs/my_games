@@ -16,12 +16,16 @@ struct Vertex
     glm::vec2 TexCoord;
 };
 
+float min(float x, float y);
+float max(float x, float y);
+
 class Mesh 
 {
 public:
     
 
     Mesh(std::vector<Vertex> vertices, std::vector<int> material_ids);
+    void center(glm::vec3 min, glm::vec3 max);
     void Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t> materials, std::map<std::string, unsigned int> textures);
 private:
     // render data
