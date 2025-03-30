@@ -55,6 +55,8 @@ class Application : public EventCallbacks
         std::shared_ptr<Program> screenShader;
         // shader for rendering a cubemapped skybox
         std::shared_ptr<Program> skyboxShader;
+        // shader for rendering reflective object
+        std::shared_ptr<Program> reflectShader;
 
         // mix ratio uniform
         float mixRatio = 0.2;
@@ -89,6 +91,7 @@ class Application : public EventCallbacks
         std::vector<glm::vec3> cubePositions;
         std::vector<glm::vec3> vegetationPositions;
 
+        const unsigned int skyboxTexture = 11;
 
         void cursorCallback(GLFWwindow *window, double xposIn, double yposIn)
         {
@@ -262,61 +265,64 @@ class Application : public EventCallbacks
             skyboxShader->setShaderNames(shaderDirectory + "/skyboxShader.vs", shaderDirectory + "/skyboxShader.fs");
             skyboxShader->init();
             skyboxShader->addAttribute("aPos");
+
+            reflectShader = std::make_shared<Program>();
+            reflectShader->setVerbose(true);
+            reflectShader->setShaderNames(shaderDirectory + "/reflectionShader.vs", shaderDirectory + "/reflectionShader.fs");
+            reflectShader->init();
+            reflectShader->addAttribute("aPos");
+            reflectShader->addAttribute("aNormal");
         }
 
         void initGeom(const std::string&resourceDirectory)
         {
-            // skySphere = new Model((resourceDirectory + "/sphere.obj").c_str());
-            // stbi_set_flip_vertically_on_load(true);
-            // skySphereTexture = TextureFromFile("/jungle_panorama.jpg", resourceDirectory);
-            // stbi_set_flip_vertically_on_load(false);
-            // ourModel = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
+            stbi_set_flip_vertically_on_load(false);
+            ourModel = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
             
             // set up vertex data (and buffer(s)) and configure vertex attributes
             // ------------------------------------------------------------------
             float cubeVertices[] = {
-                // positions          // texture Coords
-                -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-                0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-                -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-                0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-                0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-                -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-                -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+                -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+            
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+            
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+            
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+            
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+            
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
             };
 
             float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
@@ -337,9 +343,9 @@ class Application : public EventCallbacks
             glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
             glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
             glBindVertexArray(0);
             // setup transparent VAO
             glGenVertexArrays(1, &quadVAO);
@@ -552,58 +558,70 @@ class Application : public EventCallbacks
         void drawSky(glm::mat4 view, glm::mat4 projection)
         {
             CHECKED_GL_CALL(glDepthMask(GL_FALSE));
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + skyboxTexture));
             skyboxShader->bind();
             view = glm::mat4(glm::mat3(view));
             skyboxShader->setMat4("view", view);
             skyboxShader->setMat4("projection", projection);
-            skyboxShader->setInt("skybox", 0);
+            skyboxShader->setInt("skybox", skyboxTexture);
             CHECKED_GL_CALL(glBindVertexArray(skyBoxVAO));
             CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTex));
             CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 36));
             skyboxShader->unbind();
             CHECKED_GL_CALL(glDepthMask(GL_TRUE));
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
             
         }
         void drawScene(glm::mat4 view, glm::mat4 projection)
         {
 
-            texProg->bind();
+            prog->bind();
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + skyboxTexture));
+            prog->setInt("skybox", skyboxTexture);
+            prog->setFloat("refractiveIndex", 1.52f);
+            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTex));
             CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
-            texProg->setInt("texture1", 0);
+
 
             glm::mat4 model = glm::mat4(1.0f);
-            texProg->setMat4("view", view);
-            texProg->setMat4("projection", projection);
-            singleColorProg->bind();
-            singleColorProg->setMat4("view", view);
-            singleColorProg->setMat4("projection", projection);
+            prog->setMat4("model", model);
+            prog->setMat4("view", view);
+            prog->setMat4("projection", projection);
+            prog->setVector3f("viewPos", camera.Position);
+            // singleColorProg->bind();
+            // singleColorProg->setMat4("view", view);
+            // singleColorProg->setMat4("projection", projection);
 
             texProg->bind();
             // render floor
-            drawGround(texProg);
+            texProg->setMat4("view", view);
+            texProg->setMat4("projection", projection);
+            // drawGround(texProg);
 
-            glBindTexture(GL_TEXTURE_2D, cubeTexture);
-            for (int i = 0; i < cubePositions.size(); i++)
-            {
-                texProg->bind();
-                disableStencil();
-                glBindVertexArray(cubeVAO);
-                model = glm::mat4(1.0f);
-                model = glm::translate(model, cubePositions[i]);
-                texProg->setMat4("model", model);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
-                texProg->unbind();
+            prog->bind();
+            ourModel->Draw(prog);
+            // glBindTexture(GL_TEXTURE_2D, cubeTexture);
+            // for (int i = 0; i < cubePositions.size(); i++)
+            // {
+            //     reflectShader->bind();
+            //     disableStencil();
+            //     glBindVertexArray(cubeVAO);
+            //     model = glm::mat4(1.0f);
+            //     model = glm::translate(model, cubePositions[i]);
+            //     reflectShader->setMat4("model", model);
+            //     glDrawArrays(GL_TRIANGLES, 0, 36);
+            //     reflectShader->unbind();
 
-                enableStencil();
-                singleColorProg->bind();
-                glBindVertexArray(cubeVAO);
-                model = glm::scale(model, glm::vec3(1.1f));
-                singleColorProg->setMat4("model", model);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
-                singleColorProg->unbind();
-                defaultStencil();
-                glClear(GL_STENCIL_BUFFER_BIT);
-            }
+                // enableStencil();
+                // singleColorProg->bind();
+                // glBindVertexArray(cubeVAO);
+                // model = glm::scale(model, glm::vec3(1.1f));
+                // singleColorProg->setMat4("model", model);
+                // glDrawArrays(GL_TRIANGLES, 0, 36);
+                // singleColorProg->unbind();
+                // defaultStencil();
+                // glClear(GL_STENCIL_BUFFER_BIT);
+            // }
 
             drawSky(view, projection);
 
@@ -650,7 +668,7 @@ class Application : public EventCallbacks
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
             view = camera.GetViewMatrix();
-            drawScene(view, projection);
+            drawScene(view, projection);    // draw rearview mirror
 
             screenShader->bind();
             glm::mat4 model = glm::mat4(1.0f);
@@ -660,7 +678,7 @@ class Application : public EventCallbacks
             glBindVertexArray(quadVAO);
             glDisable(GL_DEPTH_TEST);
             glBindTexture(GL_TEXTURE_2D, frame_texture);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 };
 

@@ -50,6 +50,8 @@ uniform Material material;
 uniform DirLight dirLight;
 uniform PointLight pointLights[NR_POINT_LIGHTS];
 uniform SpotLight spotLight;
+uniform float refractiveIndex;
+uniform samplerCube skybox;
 
 uniform vec3 viewPos;
 
@@ -121,6 +123,21 @@ vec3 CalculateSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir
         return attenuation * light.ambient * vec3(texture(material.texture_diffuse1, TexCoords));
 }
 
+vec3 CalculateReflection(vec3 norm, vec3 fragPos, vec3 cameraPos, samplerCube skybox)
+{
+    vec3 I = normalize(fragPos - cameraPos);
+    vec3 R = reflect(I, norm);
+    return texture(skybox, R).rgb;
+}
+
+vec3 CalculateRefraction(vec3 norm, vec3 fragPos, vec3 cameraPos, samplerCube skybox)
+{
+    float ratio = 1.00 / refractiveIndex;
+    vec3 I = normalize(fragPos - cameraPos);
+    vec3 R = refract(I , norm, ratio);
+    return texture(skybox, R).rgb;
+}
+
 void main()
 {
     // properties
@@ -132,19 +149,27 @@ void main()
     // add in directional light component
     // result += CalculateDirLight(dirLight, Normal, viewDir);
     // repeat for each point light
-    for (int i = 0; i < NR_POINT_LIGHTS; i++)
-    {
-        result += CalculatePointLight(pointLights[i], Normal, FragPos, viewDir);
-    }
+    // for (int i = 0; i < NR_POINT_LIGHTS; i++)
+    // {
+    //     result += CalculatePointLight(pointLights[i], Normal, FragPos, viewDir);
+    // }
 
     // spotlight
-    result += CalculateSpotLight(spotLight, norm, FragPos, viewDir);
+    // result += CalculateSpotLight(spotLight, norm, FragPos, viewDir);
     
     // emission
     // if (vec3(texture(material.specular, TexCoords)) == vec3(0.0))
     // {
     //     result += vec3(texture(material.emission, TexCoords));
     // }
+
+    // reflection
+    vec3 reflection = CalculateReflection(norm, FragPos, viewPos, skybox);
+    // result += reflection;
+
+    // refraction
+    vec3 refraction = CalculateRefraction(norm, FragPos, viewPos, skybox);
+    result += refraction;
 
     // result += vec3(texture(material.texture_diffuse1, TexCoords));
     FragColor = vec4(result, 1.0);
