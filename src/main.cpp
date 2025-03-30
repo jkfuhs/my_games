@@ -29,13 +29,14 @@
 #define NR_POINT_LIGHTS 4
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
-#define REMEMBER_FOR_CHLOE 4780
+// configuration options
+// #define CULL_FACES 
 
 // settings
-// const unsigned int SCR_WIDTH = 800;
-// const unsigned int SCR_HEIGHT = 600;
-const unsigned int SCR_WIDTH = 1920;
-const unsigned int SCR_HEIGHT = 1080;
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+// const unsigned int SCR_WIDTH = 1920;
+// const unsigned int SCR_HEIGHT = 1080;
 
 class Application : public EventCallbacks
 {
@@ -50,6 +51,8 @@ class Application : public EventCallbacks
         std::shared_ptr<Program> skyProg;
         // shader for single set color
         std::shared_ptr<Program> singleColorProg;
+        // shader for rendering a screen
+        std::shared_ptr<Program> screenShader;
 
         // mix ratio uniform
         float mixRatio = 0.2;
@@ -70,11 +73,13 @@ class Application : public EventCallbacks
 
         unsigned int cubeVAO, cubeVBO;
         unsigned int planeVAO, planeVBO;
-        unsigned int transparentVAO, transparentVBO;
+        unsigned int quadVAO, quadVBO;
+        unsigned int fbo, rbo;  // frame buffer and render buffer objects
 
         unsigned int cubeTexture;
         unsigned int planeTexture;
         unsigned int transparentTexture;
+        unsigned int frame_texture;
 
         std::vector<glm::vec3> cubePositions;
         std::vector<glm::vec3> vegetationPositions;
@@ -200,6 +205,13 @@ class Application : public EventCallbacks
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+            // enable face culling
+            #ifdef CULL_FACES
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW);
+            #endif
+
             // intialize and set starting camera location
             camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
@@ -232,6 +244,13 @@ class Application : public EventCallbacks
             singleColorProg->setShaderNames(shaderDirectory + "/lightVertex.vs", shaderDirectory + "/singleColorShader.fs");
             singleColorProg->init();
             singleColorProg->addAttribute("aPos");
+
+            screenShader = std::make_shared<Program>();
+            screenShader->setVerbose(true);
+            screenShader->setShaderNames(shaderDirectory + "/frameBuffers.vs", shaderDirectory + "/frameBuffers.fs");
+            screenShader->init();
+            screenShader->addAttribute("aPos");
+            screenShader->addAttribute("aTexCoords");
         }
 
         void initGeom(const std::string&resourceDirectory)
@@ -289,16 +308,16 @@ class Application : public EventCallbacks
                 -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
             };
 
-            float transparentVertices[] = {
-                // positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
-                0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
-                0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
-                1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+            float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+                // positions   // texCoords
+                -1.0f,  1.0f,  0.0f, 1.0f,
+                -1.0f, -1.0f,  0.0f, 0.0f,
+                 1.0f, -1.0f,  1.0f, 0.0f,
         
-                0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
-                1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
-                1.0f,  0.5f,  0.0f,  1.0f,  0.0f
-            }; 
+                -1.0f,  1.0f,  0.0f, 1.0f,
+                 1.0f, -1.0f,  1.0f, 0.0f,
+                 1.0f,  1.0f,  1.0f, 1.0f
+            };
             
             // setup cube VAO
             glGenVertexArrays(1, &cubeVAO);
@@ -312,21 +331,43 @@ class Application : public EventCallbacks
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
             glBindVertexArray(0);
             // setup transparent VAO
-            glGenVertexArrays(1, &transparentVAO);
-            glGenBuffers(1, &transparentVBO);
-            glBindVertexArray(transparentVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+            glGenVertexArrays(1, &quadVAO);
+            glGenBuffers(1, &quadVBO);
+            glBindVertexArray(quadVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
             glBindVertexArray(0);
+            
+            // setup FBO
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            // setup FBO texture
+            glGenTextures(1, &frame_texture);
+            glBindTexture(GL_TEXTURE_2D, frame_texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame_texture, 0);
+            // setup RBO
+            glGenRenderbuffers(1, &rbo);
+            glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0); // unbind rbo
 
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            {
+                std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+            }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             // load object textures
             stbi_set_flip_vertically_on_load(true);
-            cubeTexture  = TextureFromFile("/marble.jpg", resourceDirectory);
+            cubeTexture  = TextureFromFile("/container.jpg", resourceDirectory);
             stbi_set_flip_vertically_on_load(false);
             transparentTexture = TextureFromFile("/blending_transparent_window.png", resourceDirectory);
 
@@ -398,9 +439,12 @@ class Application : public EventCallbacks
         void shutdown()
         {
             glDeleteVertexArrays(1, &cubeVAO);
+            glDeleteVertexArrays(1, &quadVAO);
             glDeleteVertexArrays(1, &planeVAO);
             glDeleteBuffers(1, &cubeVBO);
+            glDeleteBuffers(1, &quadVBO);
             glDeleteBuffers(1, &planeVBO);
+            glDeleteFramebuffers(1, &fbo);
         }
         void updateVars()
         {
@@ -445,16 +489,9 @@ class Application : public EventCallbacks
             glStencilFunc(GL_ALWAYS, 0, 0xFF);
             glStencilMask(0xFF);
         }
-        void render()
+
+        void drawScene(glm::mat4 view, glm::mat4 projection)
         {
-            CHECKED_GL_CALL(glClearColor(0.1f, 0.1f, 0.1f, 1.0f));
-            CHECKED_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT));
-
-            
-            // view/projection transformations
-            glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-            glm::mat4 view = camera.GetViewMatrix();
-
             skyProg->bind();
             CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
             skyProg->setInt("texture1", 0);
@@ -492,24 +529,60 @@ class Application : public EventCallbacks
                 defaultStencil();
                 glClear(GL_STENCIL_BUFFER_BIT);
             }
+        }
+        void render()
+        {
+            // first pass
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_STENCIL_TEST);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-            skyProg->bind();
-            glBindVertexArray(transparentVAO);
-            glBindTexture(GL_TEXTURE_2D, transparentTexture);
-            std::map<float, glm::vec3> sorted;
-            for (int i=0; i < vegetationPositions.size(); i++)
-            {
-                glm::vec3 temp = camera.Position - vegetationPositions[i];
-                float distance = glm::dot(temp, temp);
-                sorted[distance] = vegetationPositions[i];
-            }
-            for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
-            {
-                model = glm::mat4(1.0f);
-                model = glm::translate(model, it->second);				
-                skyProg->setMat4("model", model);
-                glDrawArrays(GL_TRIANGLES, 0, 6);
-            }
+            // view/projection transformations
+            glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+            camera.Reverse();
+            glm::mat4 view = camera.GetViewMatrix();
+            camera.Reverse();
+            // view = glm::rotate(view, glm::radians(180.0f), camera.Up);
+            drawScene(view, projection);
+            
+
+            // skyProg->bind();
+            // glBindVertexArray(quadVAO);
+            // glBindTexture(GL_TEXTURE_2D, transparentTexture);
+            // std::map<float, glm::vec3> sorted;
+            // for (int i=0; i < vegetationPositions.size(); i++)
+            // {
+            //     glm::vec3 temp = camera.Position - vegetationPositions[i];
+            //     float distance = glm::dot(temp, temp);
+            //     sorted[distance] = vegetationPositions[i];
+            // }
+            // for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+            // {
+            //     model = glm::mat4(1.0f);
+            //     model = glm::translate(model, it->second);				
+            //     skyProg->setMat4("model", model);
+            //     glDrawArrays(GL_TRIANGLES, 0, 6);
+            // }
+            
+            // second pass
+            glBindFramebuffer(GL_FRAMEBUFFER, 0); // default frame buffer
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+            view = camera.GetViewMatrix();
+            drawScene(view, projection);
+
+            screenShader->bind();
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, 0.7f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.3f));
+            screenShader->setMat4("model", model);
+            glBindVertexArray(quadVAO);
+            glDisable(GL_DEPTH_TEST);
+            glBindTexture(GL_TEXTURE_2D, frame_texture);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 };
 

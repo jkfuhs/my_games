@@ -92,6 +92,12 @@ public:
         Position += direction.x * Right * speed * deltaTime;
     }
 
+    void Reverse()
+    {
+        Front *= -1.0f;
+        Right *= -1.0f;
+    }
+
     // set Position to specified value
     void setCameraPos(glm::vec3 position)
     {
