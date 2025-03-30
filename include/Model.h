@@ -12,6 +12,7 @@
 #include "tiny_obj_loader.h"
 
 unsigned int TextureFromFile(const std::string path, const std::string &directory, bool gamma = false);
+unsigned int loadCubemap(const std::string path, std::vector<std::string> faces);
 
 
 static std::map<std::string, unsigned int> mk_map()

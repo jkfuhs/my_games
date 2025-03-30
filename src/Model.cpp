@@ -141,6 +141,38 @@ Mesh Model::processMesh(tinyobj::shape_t shape, tinyobj::attrib_t attribs, std::
     return Mesh(vertices, shape.mesh.material_ids);
 }
 
+unsigned int loadCubemap(const std::string path, std::vector<std::string> faces)
+{
+    unsigned int textureID;
+    CHECKED_GL_CALL(glGenTextures(1, &textureID));
+    CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_CUBE_MAP, textureID));
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        std::string filename = path + '/' + faces[i];
+        unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            CHECKED_GL_CALL(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                                        0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            ));
+        }
+        else
+        {
+            std::cout << "Cubemap tex failed to load at path: " << filename << std::endl;
+        }
+        stbi_image_free(data);
+    }
+    CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+    CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+    CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE));
+
+    return textureID;
+}
+
 unsigned int TextureFromFile(const std::string path, const std::string &directory, bool gamma)
 {
     std::string filename = std::string(path);

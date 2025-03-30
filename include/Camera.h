@@ -139,14 +139,10 @@ public:
     // moves the camera based on the values in Motion
     void move(float deltaTime)
     {
-        glm::vec3 front = Front;
-        front.y = 0;
-        glm::vec3 right = Right;
-        right.y = 0;
         if (Motion != glm::vec3(0))
         {
-            Position -= Motion.z * front * deltaTime;
-            Position += Motion.x * right * deltaTime;
+            Position -= Motion.z * glm::normalize(glm::cross(WorldUp, Right)) * deltaTime;
+            Position += Motion.x * Right * deltaTime;
             Position += Motion.y * WorldUp * deltaTime;
         }
     }

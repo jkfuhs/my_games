@@ -47,12 +47,14 @@ class Application : public EventCallbacks
         std::shared_ptr<Program> prog;
         // light source shader program
         std::shared_ptr<Program> lightProg;
-        // skysphere shader program
-        std::shared_ptr<Program> skyProg;
+        // simple texture object shader program
+        std::shared_ptr<Program> texProg;
         // shader for single set color
         std::shared_ptr<Program> singleColorProg;
         // shader for rendering a screen
         std::shared_ptr<Program> screenShader;
+        // shader for rendering a cubemapped skybox
+        std::shared_ptr<Program> skyboxShader;
 
         // mix ratio uniform
         float mixRatio = 0.2;
@@ -74,11 +76,14 @@ class Application : public EventCallbacks
         unsigned int cubeVAO, cubeVBO;
         unsigned int planeVAO, planeVBO;
         unsigned int quadVAO, quadVBO;
+        unsigned int skyBoxVAO, skyBoxVBO;
         unsigned int fbo, rbo;  // frame buffer and render buffer objects
 
+        // textures
         unsigned int cubeTexture;
         unsigned int planeTexture;
         unsigned int transparentTexture;
+        unsigned int skyBoxTex;
         unsigned int frame_texture;
 
         std::vector<glm::vec3> cubePositions;
@@ -194,7 +199,7 @@ class Application : public EventCallbacks
 
             // enable z-buffer
             CHECKED_GL_CALL(glEnable(GL_DEPTH_TEST));
-            glDepthFunc(GL_LESS); 
+            glDepthFunc(GL_LEQUAL); 
             
             // enable stencil buffer
             glEnable(GL_STENCIL_TEST);
@@ -232,12 +237,12 @@ class Application : public EventCallbacks
             lightProg->addAttribute("aPos");
 
             // Initialize shader for sky
-            skyProg = std::make_shared<Program>();
-            skyProg->setVerbose(true);
-            skyProg->setShaderNames(shaderDirectory + "/skyShader.vs", shaderDirectory + "/skyShader.fs");
-            skyProg->init();
-            skyProg->addAttribute("aPos");
-            skyProg->addAttribute("aTexCoords");
+            texProg = std::make_shared<Program>();
+            texProg->setVerbose(true);
+            texProg->setShaderNames(shaderDirectory + "/texShader.vs", shaderDirectory + "/texShader.fs");
+            texProg->init();
+            texProg->addAttribute("aPos");
+            texProg->addAttribute("aTexCoords");
 
             singleColorProg = std::make_shared<Program>();
             singleColorProg->setVerbose(true);
@@ -251,6 +256,12 @@ class Application : public EventCallbacks
             screenShader->init();
             screenShader->addAttribute("aPos");
             screenShader->addAttribute("aTexCoords");
+
+            skyboxShader = std::make_shared<Program>();
+            skyboxShader->setVerbose(true);
+            skyboxShader->setShaderNames(shaderDirectory + "/skyboxShader.vs", shaderDirectory + "/skyboxShader.fs");
+            skyboxShader->init();
+            skyboxShader->addAttribute("aPos");
         }
 
         void initGeom(const std::string&resourceDirectory)
@@ -381,6 +392,74 @@ class Application : public EventCallbacks
             vegetationPositions.push_back(glm::vec3(0.0f, 0.0f, 0.7f));
             vegetationPositions.push_back(glm::vec3(-0.3f, 0.0f, -2.3f));
             vegetationPositions.push_back(glm::vec3(0.5f, 0.0f, -0.6f));
+        }
+
+        void initSky(std::string& resourceDir)
+        {
+            std::vector<std::string> faces
+            {
+                "right.jpg",
+                "left.jpg",
+                "top.jpg",
+                "bottom.jpg",
+                "front.jpg",
+                "back.jpg"
+            };
+            skyBoxTex = loadCubemap(resourceDir + "/skybox", faces);
+
+            float skyboxVertices[] = {
+                // positions          
+                -1.0f,  1.0f, -1.0f,
+                -1.0f, -1.0f, -1.0f,
+                 1.0f, -1.0f, -1.0f,
+                 1.0f, -1.0f, -1.0f,
+                 1.0f,  1.0f, -1.0f,
+                -1.0f,  1.0f, -1.0f,
+            
+                -1.0f, -1.0f,  1.0f,
+                -1.0f, -1.0f, -1.0f,
+                -1.0f,  1.0f, -1.0f,
+                -1.0f,  1.0f, -1.0f,
+                -1.0f,  1.0f,  1.0f,
+                -1.0f, -1.0f,  1.0f,
+            
+                 1.0f, -1.0f, -1.0f,
+                 1.0f, -1.0f,  1.0f,
+                 1.0f,  1.0f,  1.0f,
+                 1.0f,  1.0f,  1.0f,
+                 1.0f,  1.0f, -1.0f,
+                 1.0f, -1.0f, -1.0f,
+            
+                -1.0f, -1.0f,  1.0f,
+                -1.0f,  1.0f,  1.0f,
+                 1.0f,  1.0f,  1.0f,
+                 1.0f,  1.0f,  1.0f,
+                 1.0f, -1.0f,  1.0f,
+                -1.0f, -1.0f,  1.0f,
+            
+                -1.0f,  1.0f, -1.0f,
+                 1.0f,  1.0f, -1.0f,
+                 1.0f,  1.0f,  1.0f,
+                 1.0f,  1.0f,  1.0f,
+                -1.0f,  1.0f,  1.0f,
+                -1.0f,  1.0f, -1.0f,
+            
+                -1.0f, -1.0f, -1.0f,
+                -1.0f, -1.0f,  1.0f,
+                 1.0f, -1.0f, -1.0f,
+                 1.0f, -1.0f, -1.0f,
+                -1.0f, -1.0f,  1.0f,
+                 1.0f, -1.0f,  1.0f
+            };
+            // setup skyBox VAO
+            glGenVertexArrays(1, &skyBoxVAO);
+            glGenBuffers(1, &skyBoxVBO);
+            glBindVertexArray(skyBoxVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, skyBoxVBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+            glBindVertexArray(0);
 
         }
 
@@ -454,26 +533,6 @@ class Application : public EventCallbacks
 
             camera.move(deltaTime);
         }
-        void render_sky(glm::mat4 projection)
-        {
-            skyProg->bind();
-            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
-            skyProg->setInt("texture1", 0);
-            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, skySphereTexture));
-            
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, camera.Position);
-            model = glm::scale(model, glm::vec3(10.0f));
-            glm::mat4 view = camera.GetViewMatrix();
-
-            CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("model"), 1, GL_FALSE, glm::value_ptr(model)));
-            // CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("view"), 1, GL_FALSE, glm::value_ptr(view)));
-            CHECKED_GL_CALL(glUniformMatrix4fv(skyProg->getUniform("projection"), 1, GL_FALSE, glm::value_ptr(projection)));
-
-            skySphere->Draw(skyProg);
-            skyProg->unbind();
-        }
-
         void disableStencil()
         {
             glStencilFunc(GL_ALWAYS, 1, 0xFF);
@@ -490,34 +549,50 @@ class Application : public EventCallbacks
             glStencilMask(0xFF);
         }
 
+        void drawSky(glm::mat4 view, glm::mat4 projection)
+        {
+            CHECKED_GL_CALL(glDepthMask(GL_FALSE));
+            skyboxShader->bind();
+            view = glm::mat4(glm::mat3(view));
+            skyboxShader->setMat4("view", view);
+            skyboxShader->setMat4("projection", projection);
+            skyboxShader->setInt("skybox", 0);
+            CHECKED_GL_CALL(glBindVertexArray(skyBoxVAO));
+            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTex));
+            CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 36));
+            skyboxShader->unbind();
+            CHECKED_GL_CALL(glDepthMask(GL_TRUE));
+            
+        }
         void drawScene(glm::mat4 view, glm::mat4 projection)
         {
-            skyProg->bind();
+
+            texProg->bind();
             CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
-            skyProg->setInt("texture1", 0);
+            texProg->setInt("texture1", 0);
 
             glm::mat4 model = glm::mat4(1.0f);
-            skyProg->setMat4("view", view);
-            skyProg->setMat4("projection", projection);
+            texProg->setMat4("view", view);
+            texProg->setMat4("projection", projection);
             singleColorProg->bind();
             singleColorProg->setMat4("view", view);
             singleColorProg->setMat4("projection", projection);
 
-            skyProg->bind();
+            texProg->bind();
             // render floor
-            drawGround(skyProg);
+            drawGround(texProg);
 
             glBindTexture(GL_TEXTURE_2D, cubeTexture);
             for (int i = 0; i < cubePositions.size(); i++)
             {
-                skyProg->bind();
+                texProg->bind();
                 disableStencil();
                 glBindVertexArray(cubeVAO);
                 model = glm::mat4(1.0f);
                 model = glm::translate(model, cubePositions[i]);
-                skyProg->setMat4("model", model);
+                texProg->setMat4("model", model);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
-                skyProg->unbind();
+                texProg->unbind();
 
                 enableStencil();
                 singleColorProg->bind();
@@ -529,6 +604,9 @@ class Application : public EventCallbacks
                 defaultStencil();
                 glClear(GL_STENCIL_BUFFER_BIT);
             }
+
+            drawSky(view, projection);
+
         }
         void render()
         {
@@ -548,7 +626,7 @@ class Application : public EventCallbacks
             drawScene(view, projection);
             
 
-            // skyProg->bind();
+            // texProg->bind();
             // glBindVertexArray(quadVAO);
             // glBindTexture(GL_TEXTURE_2D, transparentTexture);
             // std::map<float, glm::vec3> sorted;
@@ -562,13 +640,13 @@ class Application : public EventCallbacks
             // {
             //     model = glm::mat4(1.0f);
             //     model = glm::translate(model, it->second);				
-            //     skyProg->setMat4("model", model);
+            //     texProg->setMat4("model", model);
             //     glDrawArrays(GL_TRIANGLES, 0, 6);
             // }
             
             // second pass
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // default frame buffer
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
             view = camera.GetViewMatrix();
@@ -600,6 +678,7 @@ int main()
     
     application->init(shaderDir, resourceDir);
     application->initGeom(resourceDir);
+    application->initSky(resourceDir);
     application->initGround(resourceDir);
     
     while (!glfwWindowShouldClose(windowManager->getHandle()))
