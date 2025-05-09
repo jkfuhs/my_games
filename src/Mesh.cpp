@@ -14,7 +14,13 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<int> material_ids)
             this->material_ids.insert(index, material_ids[i]);
         }
     }
-    setupMesh();
+    
+}
+
+void Mesh::clearBuffers()
+{
+    CHECKED_GL_CALL(glDeleteVertexArrays(1, &VAO));
+    CHECKED_GL_CALL(glDeleteBuffers(1, &VBO));
 }
 
 void Mesh::setupMesh()
@@ -50,6 +56,9 @@ void Mesh::Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t
     // loop through mesh's material_ids
     if (material_ids[0] >= 0)
     {
+        shader->setFloat("material.shine", materials[material_ids[0]].shininess);
+        shader->setVector3f("material.emission", glm::vec3(materials[material_ids[0]].emission[0], materials[material_ids[0]].emission[1], materials[material_ids[0]].emission[2]));
+
         for (unsigned int i = 0; i < material_ids.size(); i++)
         {
             // activate texture unit before binding
@@ -83,6 +92,14 @@ void Mesh::Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t
             }        
         }
     }
+
+    for (unsigned int i = 0; i < texture_ids.size(); i++)
+    {
+        CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + textureNr));
+        shader->setInt(("material.texture_diffuse" + std::to_string(i+1)).c_str(), textureNr);
+        CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, texture_ids[i]));
+        textureNr++;
+    }
     CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
 
     // draw mesh
@@ -105,6 +122,11 @@ void Mesh::center(glm::vec3 model_min, glm::vec3 model_max)
         vertices[i].Position -= translate;
         vertices[i].Position *= 2.0f / scale;
     }
+}
+
+void Mesh::addTexture(int texture_id)
+{
+    texture_ids.push_back(texture_id);
 }
 
 float min(float x, float y)

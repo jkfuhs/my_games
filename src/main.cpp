@@ -7,8 +7,7 @@
 #include "WindowManager.h"
 #include "Program.h"
 #include "GLSL.h"
-// #include "filesystem.h"
-// #include "Shape.h"
+
 #include "MatrixStack.h" 
 #include "Camera.h"
 #include "Model.h"
@@ -57,16 +56,16 @@ class Application : public EventCallbacks
         std::shared_ptr<Program> skyboxShader;
         // shader for rendering reflective object
         std::shared_ptr<Program> reflectShader;
+        // shader for rendering leg objects
+        std::shared_ptr<Program> chameleonShader;
 
         // mix ratio uniform
-        float mixRatio = 0.2;
+        float mixRatio = 0.6;
 
         Camera camera;
 
         float deltaTime = 0.0f;
         float lastFrame = 0.0f;
-        Model *skySphere;
-        unsigned int skySphereTexture;
         Model *ourModel;
 
         float lastX = SCR_WIDTH / 2.0f;
@@ -74,19 +73,30 @@ class Application : public EventCallbacks
         bool firstMouse = true;
         glm::vec3 directionalLight = glm::vec3(-0.2f, -1.0f, -0.3f);
         glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+        bool flash_light_isOn = false;
+        bool show_rear_view = false;
 
-        unsigned int cubeVAO, cubeVBO;
+        std::vector<glm::vec3> pointLightPositions = {
+            glm::vec3(0.7f, 0.2f, 2.0f),
+            glm::vec3(2.3f, -3.3f, -4.0f),
+            glm::vec3(-4.0f, 2.0f, -12.0f),
+            glm::vec3(0.0f, 0.0f, -3.0f)
+        };
+
         unsigned int planeVAO, planeVBO;
         unsigned int quadVAO, quadVBO;
         unsigned int skyBoxVAO, skyBoxVBO;
         unsigned int fbo, rbo;  // frame buffer and render buffer objects
 
         // textures
+        std::vector<glm::vec3> textures;
         unsigned int cubeTexture;
         unsigned int planeTexture;
         unsigned int transparentTexture;
         unsigned int skyBoxTex;
         unsigned int frame_texture;
+
+        std::vector<Model *> Models;
 
         std::vector<glm::vec3> cubePositions;
         std::vector<glm::vec3> vegetationPositions;
@@ -153,6 +163,13 @@ class Application : public EventCallbacks
                     case GLFW_KEY_V:
                         camera.addMotion(glm::vec3(0.0f, -1.0f, 0.0f));
                     break;
+                    case GLFW_KEY_F:
+                        flash_light_isOn = !flash_light_isOn;
+                    break;
+                    case GLFW_KEY_R:
+                        show_rear_view = !show_rear_view;
+                    break;
+
                 }
             }
             if (action == GLFW_RELEASE)
@@ -196,6 +213,18 @@ class Application : public EventCallbacks
             CHECKED_GL_CALL(glViewport(0, 0, width, height));
         }
 
+        void initializeShader(std::shared_ptr<Program> &prog, bool verbose, const std::string &shaderDirectory, const std::string &vertexShader, const std::string &fragmentShader, const std::vector<std::string> &attributes)
+        {
+            prog = std::make_shared<Program>();
+            prog->setVerbose(verbose);
+            prog->setShaderNames(shaderDirectory + vertexShader, shaderDirectory + fragmentShader);
+            prog->init();
+            for (const auto &attribute : attributes)
+            {
+                prog->addAttribute(attribute);
+            }
+        }
+        
         void init(const std::string &shaderDirectory, const std::string &resourceDirectory)
         {
             GLSL::checkVersion();
@@ -224,106 +253,60 @@ class Application : public EventCallbacks
             camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
             // Initialize the GLSL program that we will use for local shading
-            prog = std::make_shared<Program>();
-            prog->setVerbose(true);
-            prog->setShaderNames(shaderDirectory + "/simpleVertex.vs", shaderDirectory + "/simpleFragment.fs");
-            prog->init();
-            prog->addAttribute("aPos");
-            prog->addAttribute("aNormal");
-            prog->addAttribute("aTexCoords");
-
+            std::vector<std::string> attributes = {"aPos", "aNormal", "aTexCoords"};
+            initializeShader(prog, true, shaderDirectory, "/simpleVertex.vs", "/simpleFragment.fs", attributes);
+            
             // Initialize shader for light sources
-            lightProg = std::make_shared<Program>();
-            lightProg->setVerbose(true);
-            lightProg->setShaderNames(shaderDirectory + "/lightVertex.vs", shaderDirectory + "/lightFragment.fs");
-            lightProg->init();
-            lightProg->addAttribute("aPos");
+            attributes = {"aPos"};
+            initializeShader(lightProg, true, shaderDirectory, "/lightVertex.vs", "/lightFragment.fs", attributes);
+            
+            // Initialize shader for textured objects
+            attributes = {"aPos", "aNormal", "aTexCoords"};
+            initializeShader(texProg, true, shaderDirectory, "/texShader.vs", "/texShader.fs", attributes);
 
-            // Initialize shader for sky
-            texProg = std::make_shared<Program>();
-            texProg->setVerbose(true);
-            texProg->setShaderNames(shaderDirectory + "/texShader.vs", shaderDirectory + "/texShader.fs");
-            texProg->init();
-            texProg->addAttribute("aPos");
-            texProg->addAttribute("aTexCoords");
+            // Initialize shader for single color objects
+            attributes = {"aPos"};
+            initializeShader(singleColorProg, true, shaderDirectory, "/lightVertex.vs", "/singleColorShader.fs", attributes);          
+            
+            // Initialize shader for screen rendering
+            attributes = {"aPos", "aTexCoords"};
+            initializeShader(screenShader, true, shaderDirectory, "/frameBuffers.vs", "/frameBuffers.fs", attributes);
+            
+            // Initialize shader for skybox rendering
+            attributes = {"aPos"};
+            initializeShader(skyboxShader, true, shaderDirectory, "/skyboxShader.vs", "/skyboxShader.fs", attributes);
 
-            singleColorProg = std::make_shared<Program>();
-            singleColorProg->setVerbose(true);
-            singleColorProg->setShaderNames(shaderDirectory + "/lightVertex.vs", shaderDirectory + "/singleColorShader.fs");
-            singleColorProg->init();
-            singleColorProg->addAttribute("aPos");
+            // Initialize shader for reflective objects
+            attributes = {"aPos", "aNormal"};
+            initializeShader(reflectShader, true, shaderDirectory, "/reflectionShader.vs", "/reflectionShader.fs", attributes);
 
-            screenShader = std::make_shared<Program>();
-            screenShader->setVerbose(true);
-            screenShader->setShaderNames(shaderDirectory + "/frameBuffers.vs", shaderDirectory + "/frameBuffers.fs");
-            screenShader->init();
-            screenShader->addAttribute("aPos");
-            screenShader->addAttribute("aTexCoords");
-
-            skyboxShader = std::make_shared<Program>();
-            skyboxShader->setVerbose(true);
-            skyboxShader->setShaderNames(shaderDirectory + "/skyboxShader.vs", shaderDirectory + "/skyboxShader.fs");
-            skyboxShader->init();
-            skyboxShader->addAttribute("aPos");
-
-            reflectShader = std::make_shared<Program>();
-            reflectShader->setVerbose(true);
-            reflectShader->setShaderNames(shaderDirectory + "/reflectionShader.vs", shaderDirectory + "/reflectionShader.fs");
-            reflectShader->init();
-            reflectShader->addAttribute("aPos");
-            reflectShader->addAttribute("aNormal");
+            // Initialize shader for chameleon objects
+            attributes = {"aPos", "aNormal", "aTexCoords"};
+            initializeShader(chameleonShader, true, shaderDirectory, "/simpleVertex.vs", "/chameleonShader.fs", attributes);
         }
 
         void initGeom(const std::string&resourceDirectory)
-        {
+        {   
+            Model *model;
             stbi_set_flip_vertically_on_load(false);
-            ourModel = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
+            // model = new Model((resourceDirectory + "/backpack/backpack.obj").c_str());
+            // model->model_positions.push_back({glm::vec3(4.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)});
+            // model->model_positions.push_back({glm::vec3(-4.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)});
+            // Models.push_back(model);
+
+            model = new Model((resourceDirectory + "/chameleon_leg/Chameleon_leg.obj").c_str());
+            model->model_matrices.push_back(glm::mat4(1.0f));
+            Models.push_back(model);
+
+            // model = new Model((resourceDirectory + "/cube.obj").c_str());
+            // Models.push_back(model);
+
+            // model = new Model((resourceDirectory + "/quad.obj").c_str());
+            // model->addTexture("/container.jpg");
+            // Models.push_back(model);
             
             // set up vertex data (and buffer(s)) and configure vertex attributes
             // ------------------------------------------------------------------
-            float cubeVertices[] = {
-                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-                 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-                -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
-            
-                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-                 0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-                -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-            
-                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-                -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-                -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-            
-                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-                 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-                 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-            
-                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-                 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-                -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-            
-                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-                 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-                -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
-            };
 
             float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
                 // positions   // texCoords
@@ -336,17 +319,6 @@ class Application : public EventCallbacks
                  1.0f,  1.0f,  1.0f, 1.0f
             };
             
-            // setup cube VAO
-            glGenVertexArrays(1, &cubeVAO);
-            glGenBuffers(1, &cubeVBO);
-            glBindVertexArray(cubeVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-            glBindVertexArray(0);
             // setup transparent VAO
             glGenVertexArrays(1, &quadVAO);
             glGenBuffers(1, &quadVBO);
@@ -473,13 +445,13 @@ class Application : public EventCallbacks
         {
             float planeVertices[] = {
                 // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-                5.0f, -0.501f,  5.0f,  2.0f, 0.0f,
-                -5.0f, -0.501f,  5.0f,  0.0f, 0.0f,
-                -5.0f, -0.501f, -5.0f,  0.0f, 2.0f,
+                20.0f, -0.5f,  20.0f,  8.0f, 0.0f,
+                -20.0f, -0.5f,  20.0f,  0.0f, 0.0f,
+                -20.0f, -0.5f, -20.0f,  0.0f, 8.0f,
 
-                5.0f, -0.501f,  5.0f,  2.0f, 0.0f,
-                -5.0f, -0.501f, -5.0f,  0.0f, 2.0f,
-                5.0f, -0.501f, -5.0f,  2.0f, 2.0f								
+                20.0f, -0.5f,  20.0f,  8.0f, 0.0f,
+                -20.0f, -0.5f, -20.0f,  0.0f, 8.0f,
+                20.0f, -0.5f, -20.0f,  8.0f, 8.0f								
             };
 
             glGenVertexArrays(1, &planeVAO);
@@ -499,9 +471,12 @@ class Application : public EventCallbacks
 
         void drawGround(std::shared_ptr<Program> curS)
         {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, -1.21f, 0.0f));
+
             glBindVertexArray(planeVAO);
             glBindTexture(GL_TEXTURE_2D, planeTexture);
-            curS->setMat4("model", glm::mat4(1.0f));
+            curS->setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glBindVertexArray(0);
         }
@@ -521,16 +496,65 @@ class Application : public EventCallbacks
         {
             CHECKED_GL_CALL(glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix())));
         }
-        void shutdown()
+        
+        void setLightUniforms(std::shared_ptr<Program> prog)
         {
-            glDeleteVertexArrays(1, &cubeVAO);
-            glDeleteVertexArrays(1, &quadVAO);
-            glDeleteVertexArrays(1, &planeVAO);
-            glDeleteBuffers(1, &cubeVBO);
-            glDeleteBuffers(1, &quadVBO);
-            glDeleteBuffers(1, &planeVBO);
-            glDeleteFramebuffers(1, &fbo);
+            prog->bind();
+            // set directional light uniforms
+            prog->setVector3f("dirLight.direction", directionalLight);
+            prog->setVector3f("dirLight.ambient", lightColor * 0.2f);
+            prog->setVector3f("dirLight.diffuse", lightColor * 0.9f);
+            prog->setVector3f("dirLight.specular", lightColor * 1.0f);
+
+            // set point light uniforms
+            for (int i = 0; i < NR_POINT_LIGHTS; i++)
+            {
+                std::string num = std::to_string(i);
+                prog->setVector3f("pointLights[" + num + "].position", pointLightPositions[i]);
+                prog->setVector3f("pointLights[" + num + "].ambient", lightColor * 0.2f);
+                prog->setVector3f("pointLights[" + num + "].diffuse", lightColor * 0.5f);
+                prog->setVector3f("pointLights[" + num + "].specular", lightColor * 1.0f);
+                prog->setVector3f("pointLights[" + num + "].attenuation", glm::vec3(1.0f, 0.09f, 0.032f));
+            }
+
+            // set spot light uniforms
+            prog->setVector3f("spotLight.position", camera.Position);
+            prog->setVector3f("spotLight.direction", camera.Front);
+            prog->setBool("spotLight.isOn", flash_light_isOn);
+            prog->setVector3f("spotLight.ambient", lightColor * 0.2f);
+            prog->setVector3f("spotLight.diffuse", lightColor * 0.5f);
+            prog->setVector3f("spotLight.specular", lightColor * 1.0f);
+            prog->setFloat("spotLight.innerCone", glm::cos(glm::radians(12.5f)));
+            prog->setFloat("spotLight.outerCone", glm::cos(glm::radians(15.0f)));
+            prog->setVector3f("spotLight.attenuation", glm::vec3(1.0f, 0.09f, 0.032f));
+
+            prog->unbind();
         }
+
+        void updateLegPositions()
+        {
+            glm::mat4 &left = Models[0]->model_matrices[0];
+            glm::mat4 &right = Models[0]->model_matrices[1];
+
+            left = glm::mat4(1.0f);
+            right = glm::mat4(1.0f);
+
+            left = glm::translate(left, camera.Position);
+            right = glm::translate(right, camera.Position);
+
+            left = glm::rotate(left, glm::radians(-1.0f * camera.Yaw - 90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            right = glm::rotate(right, glm::radians(-1.0f * camera.Yaw - 90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+            left = glm::translate(left, glm::vec3(-0.2f, 0.0f, 0.2f));
+            right = glm::translate(right, glm::vec3(0.2f, 0.0f, 0.2f));
+            left = glm::rotate(left, glm::radians(200.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            right = glm::rotate(right, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            left = glm::translate(left, glm::vec3(-0.062f, -0.5f, 0.129f));
+            right = glm::translate(right, glm::vec3(-0.062f, -0.5f, 0.129f));
+            left = glm::scale(left, glm::vec3(0.3f));
+            right = glm::scale(right, glm::vec3(0.3f));
+        }
+
         void updateVars()
         {
             float currentFrame = glfwGetTime();
@@ -538,6 +562,15 @@ class Application : public EventCallbacks
             lastFrame = currentFrame;
 
             camera.move(deltaTime);
+
+            // move legs
+            updateLegPositions();
+
+            setLightUniforms(prog);
+            setLightUniforms(chameleonShader);
+            chameleonShader->bind();
+            chameleonShader->setVector3f("coloring", glm::vec3(0.0f, 1.0f * mixRatio, 1.0f * (1.0f - mixRatio)));
+            chameleonShader->unbind();
         }
         void disableStencil()
         {
@@ -574,7 +607,6 @@ class Application : public EventCallbacks
         }
         void drawScene(glm::mat4 view, glm::mat4 projection)
         {
-
             prog->bind();
             CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + skyboxTexture));
             prog->setInt("skybox", skyboxTexture);
@@ -583,23 +615,31 @@ class Application : public EventCallbacks
             CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
 
 
-            glm::mat4 model = glm::mat4(1.0f);
-            prog->setMat4("model", model);
             prog->setMat4("view", view);
             prog->setMat4("projection", projection);
             prog->setVector3f("viewPos", camera.Position);
-            // singleColorProg->bind();
-            // singleColorProg->setMat4("view", view);
-            // singleColorProg->setMat4("projection", projection);
+
+            chameleonShader->bind();
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0 + skyboxTexture));
+            chameleonShader->setInt("skybox", skyboxTexture);
+            chameleonShader->setFloat("refractiveIndex", 1.52f);
+            CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTex));
+            CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+            chameleonShader->setMat4("view", view);
+            chameleonShader->setMat4("projection", projection);
+            chameleonShader->setVector3f("viewPos", camera.Position);
 
             texProg->bind();
             // render floor
             texProg->setMat4("view", view);
             texProg->setMat4("projection", projection);
-            // drawGround(texProg);
+            drawGround(texProg);
 
-            prog->bind();
-            ourModel->Draw(prog);
+            chameleonShader->bind();
+            for (Model *model : Models)
+            {
+                model->Draw(chameleonShader);
+            }
             // glBindTexture(GL_TEXTURE_2D, cubeTexture);
             // for (int i = 0; i < cubePositions.size(); i++)
             // {
@@ -628,21 +668,23 @@ class Application : public EventCallbacks
         }
         void render()
         {
-            // first pass
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_STENCIL_TEST);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-            // view/projection transformations
             glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-            camera.Reverse();
-            glm::mat4 view = camera.GetViewMatrix();
-            camera.Reverse();
-            // view = glm::rotate(view, glm::radians(180.0f), camera.Up);
-            drawScene(view, projection);
-            
+            glm::mat4 view;
+            // first pass
+            if (show_rear_view)
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+                glEnable(GL_DEPTH_TEST);
+                glEnable(GL_STENCIL_TEST);
+                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+                // view/projection transformations
+                camera.Reverse();
+                view = camera.GetViewMatrix();
+                camera.Reverse();
+                drawScene(view, projection);
+            }
 
             // texProg->bind();
             // glBindVertexArray(quadVAO);
@@ -664,23 +706,46 @@ class Application : public EventCallbacks
             
             // second pass
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // default frame buffer
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_STENCIL_TEST);
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
             view = camera.GetViewMatrix();
             drawScene(view, projection);    // draw rearview mirror
 
-            screenShader->bind();
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.0f, 0.7f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.3f));
-            screenShader->setMat4("model", model);
-            glBindVertexArray(quadVAO);
-            glDisable(GL_DEPTH_TEST);
-            glBindTexture(GL_TEXTURE_2D, frame_texture);
-            // glDrawArrays(GL_TRIANGLES, 0, 6);
+            if (show_rear_view)
+            {
+                screenShader->bind();
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3(0.0f, 0.7f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.3f));
+                screenShader->setMat4("model", model);
+                glBindVertexArray(quadVAO);
+                glDisable(GL_DEPTH_TEST);
+                glBindTexture(GL_TEXTURE_2D, frame_texture);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }   
         }
+
+        void shutdown()
+            {
+                for (Model *model : Models)
+                {
+                    model->clearBuffers();
+                
+                    delete model;
+                }
+                Models.clear();
+                glDeleteVertexArrays(1, &skyBoxVAO);
+                glDeleteVertexArrays(1, &quadVAO);
+                glDeleteVertexArrays(1, &planeVAO);
+                glDeleteBuffers(1, &quadVBO);
+                glDeleteBuffers(1, &planeVBO);
+                glDeleteFramebuffers(1, &fbo);
+            }
 };
+
 
 
 int main()

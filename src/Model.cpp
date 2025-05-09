@@ -1,21 +1,37 @@
 #include "Model.h"
 
+std::map<std::string, unsigned int> Model::textures_loaded;
 
-
-Model::Model(const std::string path, const std::map<std::string, unsigned int> default_map): textures_loaded(default_map)
+Model::Model(const std::string &path)
 {
+    // default model position
+    model_matrices.push_back(glm::mat4(1.0f));
+
     loadModel(path);
+}
+
+void Model::clearBuffers()
+{
+    for (unsigned int i = 0; i < meshes.size(); i++)
+    {
+        meshes[i].clearBuffers();
+    }
 }
 
 void Model::Draw(std::shared_ptr<Program> shader)
 {
-    for (unsigned int i = 0; i < meshes.size(); i++)
+    for (glm::mat4 &m : model_matrices)
     {
-        meshes[i].Draw(shader, materials, textures_loaded);
+        shader->setMat4("model", m);
+
+        for (unsigned int i = 0; i < meshes.size(); i++)
+        {
+            meshes[i].Draw(shader, materials, textures_loaded);
+        }
     }
 }
 
-void Model::loadModel(std::string path)
+void Model::loadModel(const std::string &path)
 {
     tinyobj::ObjReader reader;
     tinyobj::ObjReaderConfig reader_config;
@@ -51,15 +67,16 @@ void Model::loadModel(std::string path)
         meshes.push_back(mesh);
     }
 
-    // loop over materials
-    for (size_t m = 0; m < materials.size(); m++)
+    // load textures
+    for (tinyobj::material_t &m : materials)
     {
-        loadMaterialTextures(materials[m]);
+        loadMaterialTextures(m);
     }
-
-    for (size_t m = 0; m < meshes.size(); m++)
+    // center meshes and bind buffers
+    for (Mesh &mesh : meshes)
     {
-        meshes[m].center(model_min, model_max);
+        mesh.center(model_min, model_max);
+        mesh.setupMesh();
     }
 }
 
@@ -89,6 +106,19 @@ void Model::loadMaterialTextures(tinyobj::material_t material)
                 textures_loaded[path] = texture_id;
             }
         }
+}
+
+void Model::addTexture(const std::string &texture_name)
+{
+    if (textures_loaded.find(texture_name) == textures_loaded.end())
+    {
+        unsigned int texture_id = TextureFromFile(texture_name, resource_directory);
+        textures_loaded[texture_name] = texture_id;
+    }
+    for (Mesh &mesh : meshes)
+    {
+        mesh.addTexture(textures_loaded[texture_name]);
+    }
 }
 
 Mesh Model::processMesh(tinyobj::shape_t shape, tinyobj::attrib_t attribs, std::vector<tinyobj::material_t> materials)
@@ -141,7 +171,7 @@ Mesh Model::processMesh(tinyobj::shape_t shape, tinyobj::attrib_t attribs, std::
     return Mesh(vertices, shape.mesh.material_ids);
 }
 
-unsigned int loadCubemap(const std::string path, std::vector<std::string> faces)
+unsigned int loadCubemap(const std::string &path, const std::vector<std::string> &faces)
 {
     unsigned int textureID;
     CHECKED_GL_CALL(glGenTextures(1, &textureID));
@@ -173,7 +203,7 @@ unsigned int loadCubemap(const std::string path, std::vector<std::string> faces)
     return textureID;
 }
 
-unsigned int TextureFromFile(const std::string path, const std::string &directory, bool gamma)
+unsigned int TextureFromFile(const std::string &path, const std::string &directory, bool gamma)
 {
     std::string filename = std::string(path);
     filename = directory + '/' + filename;

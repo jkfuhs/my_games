@@ -35,6 +35,7 @@ class Program
 
         void addAttribute(const std::string &name);
         void addUniform(const std::string &name);
+        void setBool(const std::string &name, bool b);
         void setInt(const std::string &name, int i);
         void setFloat(const std::string &name, float f);
         void setVector3f(const std::string &name, glm::vec3 v);

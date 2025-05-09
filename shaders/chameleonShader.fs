@@ -55,6 +55,8 @@ uniform float refractiveIndex;
 uniform samplerCube skybox;
 uniform vec3 viewPos;
 
+uniform vec3 coloring;
+
 out vec4 FragColor;
 
 vec3 CalculateDirLight(DirLight light, vec3 normal, vec3 viewDir)
@@ -169,7 +171,7 @@ void main()
     vec3 refraction = CalculateRefraction(norm, FragPos, viewPos, skybox);
     // result += refraction;
 
-    result *= 0.5;
+    result *= 0.5 * coloring;
     FragColor = vec4(result, 1.0);
 
 }

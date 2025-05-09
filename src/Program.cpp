@@ -113,6 +113,18 @@ void Program::addUniform(const std::string &name)
     uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
 }
 
+void Program::setBool(const std::string &name, bool b)
+{
+    std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
+    if (uniform == uniforms.end())
+    {
+        uniforms[name] = GLSL::getUniformLocation(pid, name.c_str(), isVerbose());
+        CHECKED_GL_CALL(glUniform1i(uniforms[name], b ? 1 : 0));
+        return;
+    }
+    CHECKED_GL_CALL(glUniform1i(uniform->second, b ? 1 : 0));
+}
+
 void Program::setInt(const std::string &name, int i)
 {
     std::map<std::string, GLint>::const_iterator uniform = uniforms.find(name.c_str());
