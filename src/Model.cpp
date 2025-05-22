@@ -18,7 +18,7 @@ void Model::clearBuffers()
     }
 }
 
-void Model::Draw(std::shared_ptr<Program> shader)
+void Model::Draw(Program *shader)
 {
     for (glm::mat4 &m : model_matrices)
     {

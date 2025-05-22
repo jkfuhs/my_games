@@ -200,3 +200,15 @@ GLint Program::getUniform(const std::string &name) const
     }
     return uniform->second;
 }
+
+void Program::drawModels(glm::mat4 view, glm::mat4 projection, glm::vec3 viewPos)
+{
+    bind();
+    setMat4("view", view);
+    setMat4("projection", projection);
+    setVector3f("viewPos", viewPos);
+    for (Model *model : models)
+    {
+        model->Draw(this);
+    }
+}

@@ -6,6 +6,7 @@
             "command": "g++",
             "args": [
                 "${workspaceRoot}/src/main.cpp",
+                "${workspaceRoot}/src/Application.cpp",
                 "${workspaceRoot}/src/glad.c",
                 "${workspaceRoot}/src/WindowManager.cpp",
                 "${workspaceRoot}/src/Program.cpp",

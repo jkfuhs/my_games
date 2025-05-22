@@ -41,7 +41,8 @@ struct SpotLight
 };
 
 
-#define NR_POINT_LIGHTS 4
+#define NR_MAX_POINT_LIGHTS 100
+#define NR_MAX_SPOT_LIGHTS 100
 
 in vec3 Normal;
 in vec3 FragPos;
@@ -49,7 +50,10 @@ in vec2 TexCoords;
 
 uniform Material material;
 uniform DirLight dirLight;
-uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform int nPointLights;
+uniform PointLight pointLights[NR_MAX_POINT_LIGHTS];
+uniform int nSpotLights;
+uniform SpotLight spotLights[NR_MAX_SPOT_LIGHTS];
 uniform SpotLight spotLight;
 uniform float refractiveIndex;
 uniform samplerCube skybox;
@@ -147,16 +151,19 @@ void main()
     vec3 result = vec3(0.0);
 
     // add in directional light component
-    result += CalculateDirLight(dirLight, Normal, viewDir);
+    result += CalculateDirLight(dirLight, norm, viewDir);
     // repeat for each point light
-    for (int i = 0; i < NR_POINT_LIGHTS; i++)
+    for (int i = 0; i < nPointLights; i++)
     {
-        result += CalculatePointLight(pointLights[i], Normal, FragPos, viewDir);
+        result += CalculatePointLight(pointLights[i], norm, FragPos, viewDir);
     }
 
     // spotlight
-    if (spotLight.isOn != 0)
-        result += CalculateSpotLight(spotLight, norm, FragPos, viewDir);
+    for (int i = 0; i < nSpotLights; i++)
+    {
+        if (spotLight.isOn != 0)
+            result += CalculateSpotLight(spotLights[i], norm, FragPos, viewDir);
+    }
     
     // emission
     result += material.emission * vec3(texture(material.texture_emission1, TexCoords));
@@ -171,5 +178,4 @@ void main()
 
     result *= 0.5;
     FragColor = vec4(result, 1.0);
-
 }

@@ -10,7 +10,14 @@
 #define PITCH_MIN   -89.0f
 #define PITCH_MAX    89.0f
 
-enum Camera_Movement {
+enum class Camera_Type
+{
+    FIRST_PERSON,
+    THIRD_PERSON,
+    FREE_CAMERA
+};
+
+enum class Camera_Movement {
     FORWARD,
     BACKWARD,
     LEFT,
@@ -27,6 +34,10 @@ const float ZOOM            = 45.0f;
 class Camera
 {
 public:
+
+    // camera options
+    Camera_Type Type;
+
     // camera Attributes
     glm::vec3 Position;
     glm::vec3 Front;
@@ -43,13 +54,14 @@ public:
     float Zoom;
 
     // constructor with vectors
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) 
+    Camera(Camera_Type type, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) 
         : Front(glm::vec3(0.0f, 0.0f, -1.0f)),
           Motion(glm::vec3(0.0f)),
           MovementSpeed(SPEED), 
           MouseSensitivity(SENSITIVITY), 
           Zoom(ZOOM)
     {
+        Type = type;
         Position = position;
         WorldUp = up;
         Yaw = yaw;

@@ -47,7 +47,7 @@ void Mesh::setupMesh()
     CHECKED_GL_CALL(glBindVertexArray(0));
 }
 
-void Mesh::Draw(std::shared_ptr<Program> shader, std::vector<tinyobj::material_t> materials, std::map<std::string, unsigned int> textures)
+void Mesh::Draw(Program *shader, std::vector<tinyobj::material_t> materials, std::map<std::string, unsigned int> textures)
 {
     unsigned int diffuseNr = 1;
     unsigned int specularNr = 1;

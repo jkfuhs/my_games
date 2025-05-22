@@ -1,15 +1,18 @@
-#ifndef MODEL_INCLUDE_H
-#define MODEL_INCLUDE_H
+#pragma once
+
+#include "Model.fwd.h"
 
 #include <iostream>
 #include <vector>
 #include <memory>
 
-
+#include "Mesh.fwd.h"
 #include "Mesh.h"
+#include "Program.fwd.h"
 #include "Program.h"
 #include "stb_image.h"
 #include "tiny_obj_loader.h"
+#include "D:/my_games/lib/glm/gtc/type_ptr.hpp"
 
 
 unsigned int TextureFromFile(const std::string &path, const std::string &directory, bool gamma = false);
@@ -27,7 +30,7 @@ public:
     Model(const std::string &path);
     
     // draw the model and all of its meshes
-    void Draw(std::shared_ptr<Program> shader);
+    void Draw(Program *shader);
 
     void addTexture(const std::string &texture_name);
 
@@ -49,5 +52,3 @@ private:
     void loadMaterialTextures(tinyobj::material_t material);
 
 };
-
-#endif // MODEL_INCLUDE_H
